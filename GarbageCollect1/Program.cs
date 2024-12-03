@@ -29,7 +29,9 @@ using System.Text;
 
 //Console.WriteLine(list.Count);
 
-new MyDisposeMain().Do();
+//new MyDisposeMain().Do();
+
+new DoWorkObj().HeapLocation();
 
 
 Console.ReadKey();
