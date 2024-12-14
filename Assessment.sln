@@ -7,6 +7,31 @@ Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "GarbageCollect1", "GarbageC
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "refTypes", "refTypes\refTypes.csproj", "{89C4090B-9BC4-4CC4-BB8B-C0472BD01261}"
 EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "AsyncWebAPI", "AsyncWebAPI\AsyncWebAPI.csproj", "{B22C9A88-9DD0-44A6-B1D8-842548F90AE8}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "SessionTest", "SessionTest\SessionTest.csproj", "{D7BCACF2-F22F-4EC3-9865-B676738048E2}"
+EndProject
+Project("{E24C65DC-7377-472B-9ABA-BC803B73C61A}") = "SessionUI", "SessionUI\SessionUI\", "{E00536E6-FF47-4941-AD40-8469BDA34BD5}"
+	ProjectSection(WebsiteProperties) = preProject
+		TargetFrameworkMoniker = ".NETFramework,Version%3Dv4.0"
+		Debug.AspNetCompiler.VirtualPath = "/localhost_51466"
+		Debug.AspNetCompiler.PhysicalPath = "SessionUI\SessionUI\"
+		Debug.AspNetCompiler.TargetPath = "PrecompiledWeb\localhost_51466\"
+		Debug.AspNetCompiler.Updateable = "true"
+		Debug.AspNetCompiler.ForceOverwrite = "true"
+		Debug.AspNetCompiler.FixedNames = "false"
+		Debug.AspNetCompiler.Debug = "True"
+		Release.AspNetCompiler.VirtualPath = "/localhost_51466"
+		Release.AspNetCompiler.PhysicalPath = "SessionUI\SessionUI\"
+		Release.AspNetCompiler.TargetPath = "PrecompiledWeb\localhost_51466\"
+		Release.AspNetCompiler.Updateable = "true"
+		Release.AspNetCompiler.ForceOverwrite = "true"
+		Release.AspNetCompiler.FixedNames = "false"
+		Release.AspNetCompiler.Debug = "False"
+		VWDPort = "51466"
+		SlnRelativePath = "SessionUI\SessionUI\"
+	EndProjectSection
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Any CPU = Debug|Any CPU
@@ -21,6 +46,18 @@ Global
 		{89C4090B-9BC4-4CC4-BB8B-C0472BD01261}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{89C4090B-9BC4-4CC4-BB8B-C0472BD01261}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{89C4090B-9BC4-4CC4-BB8B-C0472BD01261}.Release|Any CPU.Build.0 = Release|Any CPU
+		{B22C9A88-9DD0-44A6-B1D8-842548F90AE8}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{B22C9A88-9DD0-44A6-B1D8-842548F90AE8}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{B22C9A88-9DD0-44A6-B1D8-842548F90AE8}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{B22C9A88-9DD0-44A6-B1D8-842548F90AE8}.Release|Any CPU.Build.0 = Release|Any CPU
+		{D7BCACF2-F22F-4EC3-9865-B676738048E2}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{D7BCACF2-F22F-4EC3-9865-B676738048E2}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{D7BCACF2-F22F-4EC3-9865-B676738048E2}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{D7BCACF2-F22F-4EC3-9865-B676738048E2}.Release|Any CPU.Build.0 = Release|Any CPU
+		{E00536E6-FF47-4941-AD40-8469BDA34BD5}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{E00536E6-FF47-4941-AD40-8469BDA34BD5}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{E00536E6-FF47-4941-AD40-8469BDA34BD5}.Release|Any CPU.ActiveCfg = Debug|Any CPU
+		{E00536E6-FF47-4941-AD40-8469BDA34BD5}.Release|Any CPU.Build.0 = Debug|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE
