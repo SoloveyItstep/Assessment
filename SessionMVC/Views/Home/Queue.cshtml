@@ -1,0 +1,76 @@
+﻿@page
+
+@{
+    Layout = "~/Views/Shared/_Layout.cshtml";
+}
+
+
+<h1>Queue</h1>
+
+<div class="col-6">
+    <div>
+        <input type="text" id="message" placeholder="Message" />
+        <br />
+        <button id="submit" onclick="Send()" class="btn btn-primary">Seng message</button>
+    </div>
+</div>
+<br />
+<br />
+<p>Queue list</p>
+<button id="get" onclick="Get()" class="btn btn-primary">Get message</button>
+<br />
+<div class="container">
+    <table id="table" data-height="460">
+        <thead>
+            <tr>
+                <th data-field="message">Message</th>
+            </tr>
+        </thead>
+    </table>
+</div>
+<script>
+    $(function() {
+         $('#table').bootstrapTable();
+    });
+
+    function Send() {
+        const message = document.getElementById("message").value;
+        fetch("/queue/send?message=" + message, {
+            method: "POST",
+            headers: {
+                "Content-type": "application/json; charset=UTF-8"
+            }
+        })
+        .then((response) => {
+            $("#message").val("");
+        })
+        .then((json) => console.log(json));
+    }
+
+    function Get() {
+        fetch("/queue", {
+            method: "GET",
+            headers: {
+                "Content-type": "application/json; charset=UTF-8"
+            }
+        })
+        .then((response) => {
+            console.log(response);
+            response.json().then((json) => {
+                console.log(json);
+                let list = [];
+
+                $('#table > tbody').empty();
+
+                for(i = 0; i < json.length; ++i){
+                    list.push({message: json[i]});
+                }
+
+                $('#table').bootstrapTable('append',list);
+            });
+            
+        })
+        .then((json) => console.log(json));
+    }
+</script>
+

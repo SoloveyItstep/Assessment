@@ -8,7 +8,6 @@ using SessionMVC.Models.DTOs;
 using SessionMVC.Repositories;
 using SessionMVC.Services;
 using SessionMVC.Helpers;
-using Microsoft.OpenApi.Writers;
 using Microsoft.AspNetCore.Server.Kestrel.Core;
 
 var builder = WebApplication.CreateBuilder(args);
@@ -43,6 +42,8 @@ builder.WebHost.ConfigureKestrel(serverOptions =>
         listenOptions.Protocols = HttpProtocols.Http1AndHttp2;
     });
 });
+
+builder.Services.AddRazorPages();
 
 //builder.WebHost.UseUrls("http://*:5000;https://*:5001;http://*:80;https://*:443;http://*:8080");
 var connectionString = builder.Configuration.GetConnectionString("AssessmentDbConnectionString");
@@ -79,6 +80,7 @@ builder.Services.AddSession(options =>
 
 builder.Services.AddTransient<IWeatherRepository, WeatherRepository>();
 builder.Services.AddTransient<IWeatherService, WeatherService>();
+builder.Services.AddTransient<IQueueService, QueueService>();
 
 builder.Services.AddSwaggerGen();
 
@@ -116,7 +118,7 @@ app.UseSwagger();
 app.UseSwaggerUI();
 app.UseSession();
 
-app.UseMiddleware<SessionLimitMiddleware>(13);
+app.UseMiddleware<SessionLimitMiddleware>(30);
 
 app.MapControllerRoute(
     name: "default",
@@ -140,5 +142,7 @@ if (!dbLogged)
     }
 
 }
+
+app.MapRazorPages();
 
 await app.RunAsync();

@@ -13,6 +13,8 @@
       db:
         condition: service_healthy
         restart: true
+      rabbitmq:
+        condition: service_healthy
     networks:
       - devnetwork
     restart: unless-stopped
@@ -38,6 +40,25 @@
       interval: 10s
       timeout: 5s
       retries: 10
+   
+  rabbitmq:
+    image: rabbitmq:4.1-management
+    container_name: rabbitmq
+    tty: true
+    hostname: rabbitmq
+    environment:
+      RABBITMQ_DEFAULT_USER: "guest"
+      RABBITMQ_DEFAULT_PASS: "guest"
+      RABBITMQ_SERVER_ADDITIONAL_ERL_ARGS: -rabbitmq_stream advertised_host localhost
+    healthcheck:
+      test: rabbitmq-diagnostics -q ping
+      interval: 5s
+      timeout: 15s
+      retries: 3
+    ports:
+      - "5672:5672"
+      - "15672:15672"
+      - "5552:5552"
 
 volumes:
   sqlvolume:
