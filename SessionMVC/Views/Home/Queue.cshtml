@@ -4,20 +4,20 @@
     Layout = "~/Views/Shared/_Layout.cshtml";
 }
 
-
-<h1>Queue</h1>
+<h1>Add queue</h1>
 
 <div class="col-6">
     <div>
         <input type="text" id="message" placeholder="Message" />
-        <br />
+        &nbsp;&nbsp;
         <button id="submit" onclick="Send()" class="btn btn-primary">Seng message</button>
     </div>
 </div>
 <br />
 <br />
-<p>Queue list</p>
-<button id="get" onclick="Get()" class="btn btn-primary">Get message</button>
+<h1>Queue list</h1>
+<button id="get" onclick="Get()" class="btn btn-primary">Get messages</button>
+<br />
 <br />
 <div class="container">
     <table id="table" data-height="460">
@@ -56,12 +56,10 @@
         })
         .then((response) => {
             console.log(response);
+             $('#table > tbody').empty();
             response.json().then((json) => {
                 console.log(json);
                 let list = [];
-
-                $('#table > tbody').empty();
-
                 for(i = 0; i < json.length; ++i){
                     list.push({message: json[i]});
                 }
