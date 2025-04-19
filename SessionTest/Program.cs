@@ -1,11 +1,7 @@
 using log4net.Config;
 using log4net;
 using Microsoft.AspNetCore.DataProtection;
-using Microsoft.AspNetCore.RateLimiting;
 using System.Threading.RateLimiting;
-using SessionTest;
-using System.ComponentModel;
-using Microsoft.Extensions.Primitives;
 using Microsoft.AspNetCore.Authentication.Cookies;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using System.Globalization;
@@ -31,12 +27,15 @@ options.AddPolicy("AllowSetOrigins", opt =>
 }));
 
 builder.Services.AddControllers();
-
+builder.Services.AddDistributedMemoryCache();
 builder.Services.AddSession(options =>
 {
     options.IdleTimeout = TimeSpan.FromMinutes(15);
     options.Cookie.HttpOnly = true;
     options.Cookie.IsEssential = true;
+    options.Cookie.Name = ".AspNetCore.Session";
+    options.Cookie.SameSite = SameSiteMode.Lax;
+    options.Cookie.SecurePolicy = CookieSecurePolicy.Always;
 });
 
 // Learn more about configuring OpenAPI at https://aka.ms/aspnet/openapi
@@ -48,8 +47,6 @@ builder.Services.AddLogging(options =>
     XmlConfigurator.Configure(new FileInfo("log4net.config"));
     options.Services.AddSingleton(LogManager.GetLogger(typeof(Program)));
 });
-
-builder.Services.AddDistributedMemoryCache();
 
 builder.Services.AddDataProtection()
     .SetDefaultKeyLifetime(TimeSpan.FromDays(14));
@@ -99,14 +96,17 @@ builder.Services.AddRateLimiter(options => {
     {
         var sessionId = httpContext.Session.Id;
 
-        var key = ".AspNetCore.Session";
+        //var count = httpContext.Session.
 
-        var value = httpContext.Session.GetString(key);
+        //var key = ".AspNetCore.Session";
 
-        if (value == null)
-        {
-            httpContext.Session.SetString(key, sessionId);
-        }
+        //var value = httpContext.Session.GetString(key);
+
+        //if (value == null)
+        //{
+        //    httpContext.Session.SetString(key, sessionId);
+        //    httpContext.Session.CommitAsync().GetAwaiter().GetResult();
+        //}
 
         return RateLimitPartition.GetTokenBucketLimiter(sessionId, _ =>
         {
@@ -120,8 +120,6 @@ builder.Services.AddRateLimiter(options => {
                 TokensPerPeriod = 1
             };
         });
-
-
 
     }).RejectionStatusCode = StatusCodes.Status429TooManyRequests;
 });
@@ -144,6 +142,11 @@ app.UseHttpsRedirection();
 app.UseAuthorization();
 app.UseAuthentication();
 
+app.UseCookiePolicy(new CookiePolicyOptions
+{
+    Secure = CookieSecurePolicy.Always,
+    MinimumSameSitePolicy = SameSiteMode.None
+});
 app.UseSession();
 
 app.UseRateLimiter();

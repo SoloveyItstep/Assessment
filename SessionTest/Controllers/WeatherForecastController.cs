@@ -1,4 +1,5 @@
 using log4net;
+using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.RateLimiting;
 
@@ -33,6 +34,17 @@ public class WeatherForecastController(ILog logger) : ControllerBase
     [ProducesResponseType(typeof(HttpResponseMessage), 200)]
     public IActionResult GetId()
     {
-        return Ok(new { Id = HttpContext.Session.Id });
+        var key = ".AspNetCore.Session";
+
+        var value = HttpContext.Session.GetString(key);
+
+        if (value == null)
+        {
+            HttpContext.Session.SetString(key, HttpContext.Session.Id);
+            HttpContext.Session.CommitAsync().GetAwaiter().GetResult();
+        }
+
+        throw new Exception("test");
+//        return Ok(new { Id = HttpContext.Session.Id });
     }
 }
