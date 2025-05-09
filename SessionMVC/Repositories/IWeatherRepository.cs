@@ -12,4 +12,10 @@ public interface IWeatherRepository
     public WeatherForecast? GetForecastByDate(DateOnly date);
 
     public int CreateForecast(WeatherForecast forecast);
+
+    public List<SummaryMongoDB> GetSummariesMongo();
+
+    public WeatherForecastMongoDB? GetForecastMongoByDate(DateOnly date);
+
+    public int CreateForecastMongo(WeatherForecastMongoDB forecast);
 }

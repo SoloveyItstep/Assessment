@@ -15,19 +15,19 @@ public class WeatherService(IWeatherRepository repo, IMapper mapper) : IWeatherS
     public WeatherForecastDto GetForecast()
     {
         DateOnly date = DateOnly.FromDateTime(DateTime.Now);
-        var forecast = repo.GetForecastByDate(date);
+        var forecast = repo.GetForecastMongoByDate(date);
 
         if(forecast == null)
         {
-            var summaries = repo.GetSummaries();
-            forecast = new WeatherForecast
+            var summaries = repo.GetSummariesMongo();
+            forecast = new WeatherForecastMongoDB
             {
                 Date = date,
                 TemperatureC = Random.Shared.Next(-20, 55),
                 Summary = summaries[Random.Shared.Next(summaries.Count)].State
             };
 
-            repo.CreateForecast(forecast);
+            repo.CreateForecastMongo(forecast);
         }
 
         return mapper.Map<WeatherForecastDto>(forecast);

@@ -1,4 +1,6 @@
-﻿using SessionMVC.Context;
+﻿using MongoDB.Bson;
+using MongoDB.Driver;
+using SessionMVC.Context;
 using SessionMVC.Models;
 
 namespace SessionMVC.Repositories;
@@ -6,7 +8,11 @@ namespace SessionMVC.Repositories;
 /// <summary>
 /// weather repo
 /// </summary>
-public class WeatherRepository(AssessmentDbContext context, ILogger<WeatherRepository> logger) : IWeatherRepository
+public class WeatherRepository(
+    AssessmentDbContext context, 
+    ILogger<WeatherRepository> logger,
+    IMongoDatabase mongoDatabase
+    ) : IWeatherRepository
 {
     public int CreateForecast(WeatherForecast forecast)
     {
@@ -40,16 +46,65 @@ public class WeatherRepository(AssessmentDbContext context, ILogger<WeatherRepos
 
     public List<Summary> GetSummaries()
     {
-        List<Summary> result = [];
         try
         {
-            result = [.. context.Summarys];
+            return [.. context.Summarys];
         }
         catch (Exception ex)
         {
             logger.LogError(ex, "Error message");
         }
 
-        return result;
+        return [];
+    }
+
+    public List<SummaryMongoDB> GetSummariesMongo()
+    {
+        try
+        {
+            var collection = mongoDatabase.GetCollection<SummaryMongoDB>("Summarys");
+            var summaries = collection.Find(new BsonDocument()).ToList();
+            
+            return summaries;
+        }
+        catch (Exception ex)
+        {
+            logger.LogError(ex, "Error message");
+        }
+        return [];
+    }
+
+    public WeatherForecastMongoDB? GetForecastMongoByDate(DateOnly date)
+    {
+        try
+        {
+            var collection = mongoDatabase.GetCollection<WeatherForecastMongoDB>("WeatherForecasts");
+            var filter = Builders<WeatherForecastMongoDB>.Filter.Eq("Date", date);
+            var forecast = collection.Find(filter).FirstOrDefault();
+            
+            return forecast;
+        }
+        catch (Exception ex)
+        {
+            logger.LogError(ex, "error");
+        }
+
+        return null;
+    }
+
+    public int CreateForecastMongo(WeatherForecastMongoDB forecast)
+    {
+        try
+        {
+            var collection = mongoDatabase.GetCollection<WeatherForecastMongoDB>("WeatherForecasts");
+            collection.InsertOne(forecast);
+
+            return 1;
+        }
+        catch (Exception ex)
+        {
+            logger.LogError(ex, "create error");
+        }
+        return 0;
     }
 }

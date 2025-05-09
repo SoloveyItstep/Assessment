@@ -9,6 +9,8 @@ using SessionMVC.Repositories;
 using SessionMVC.Services;
 using SessionMVC.Helpers;
 using Microsoft.AspNetCore.Server.Kestrel.Core;
+using MongoDB.Bson;
+using MongoDB.Driver;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -19,6 +21,8 @@ var builder = WebApplication.CreateBuilder(args);
 //var connectionString = $"Data Source={dbHost};Initial Catalog={dbName}; Integrated Security=True;Encrypt=False;Password={dbPass}";
 //"Data Source=VSOLOVEI-NOUT2;Initial Catalog=Assessment; Integrated Security=True;Encrypt=False";
 // builder.Configuration.GetConnectionString("AssessmentDbConnectionString");
+var MongoDbUri = Environment.GetEnvironmentVariable("MongoConnectionString");
+
 builder.WebHost.ConfigureKestrel(serverOptions =>
 {
     serverOptions.Listen(System.Net.IPAddress.Any, 5000, listenOptions =>
@@ -57,6 +61,7 @@ builder.Services.AddDbContext<AssessmentDbContext>(options => {
 builder.Services.AddAutoMapper(config =>
 {
     config.CreateMap<WeatherForecast, WeatherForecastDto>().ReverseMap();
+    config.CreateMap<WeatherForecastMongoDB, WeatherForecastDto>().ReverseMap();
 });
 
 builder.Services.AddHealthChecks()
@@ -65,6 +70,8 @@ builder.Services.AddHealthChecks()
     customTestQuery: async (context, cancellationToken) => {
         return await context.CanConnectToDbAsync(builder.Services.BuildServiceProvider().GetRequiredService<ILog>());
     });
+
+builder.Services.AddSingleton(new MongoClient(MongoDbUri).GetDatabase("Assessment"));
 
 builder.Services.AddDistributedMemoryCache();
 builder.Services.AddHttpContextAccessor();
@@ -125,11 +132,11 @@ app.MapControllerRoute(
     pattern: "{controller=Home}/{action=Index}/{id?}")
     .WithStaticAssets();
 
+using var scope = app.Services.CreateScope();
+var logger = scope.ServiceProvider.GetRequiredService<ILog>();
 var dbLogged = false;
 if (!dbLogged)
 {
-    using var scope = app.Services.CreateScope();
-    var logger = scope.ServiceProvider.GetRequiredService<ILog>();
     try
     {
         var dbContext = scope.ServiceProvider.GetRequiredService<AssessmentDbContext>();
@@ -141,6 +148,22 @@ if (!dbLogged)
         logger.Error("========== Database connection failed", ex);
     }
 
+    try
+    { 
+        var database = scope.ServiceProvider.GetRequiredService<IMongoDatabase>();
+        DBHelper.InitMongoDb(database);
+       
+        var collection = database.GetCollection<WeatherForecastMongoDB>("WeatherForecasts");
+        var list = await collection.Find(new BsonDocument()).ToListAsync();
+    }
+    catch (Exception ex)
+    {
+        logger.Error("========== Mongo Database connection failed", ex);
+    }
+    finally
+    {
+        dbLogged = true;
+    }
 }
 
 app.MapRazorPages();

@@ -7,6 +7,7 @@
     environment:
       - ASPNETCORE_ENVIRONMENT=Development
       - ConnectionStrings__AssessmentDbConnectionString=Server=db;Database=Assessment;User=sa;Password=Your_password123;Encrypt=True;TrustServerCertificate=True
+      - MongoConnectionString=mongodb://host.docker.internal:27017/27017?directConnection=true
     ports:
       - "8081:5000" # Прокидаємо порт 5000 (HTTP) з контейнера на порт 8081 хост-машини
     depends_on:
@@ -14,6 +15,8 @@
         condition: service_healthy
         restart: true
       rabbitmq:
+        condition: service_healthy
+      mongo:
         condition: service_healthy
     networks:
       - devnetwork
@@ -59,6 +62,20 @@
       - "5672:5672"
       - "15672:15672"
       - "5552:5552"
+ 
+
+  mongo:
+    image: mongo
+    restart: always
+    ports:
+      - 27017:27017
+    environment:
+      ME_CONFIG_MONGODB_ADMINUSERNAME: root
+      ME_CONFIG_MONGODB_ADMINPASSWORD: example
+      ME_CONFIG_BASICAUTH: false
+      ME_CONFIG_MONGODB_URL: mongodb://127.0.0.1:27017/27017?directConnection=true
+    healthcheck:
+      test: echo 'db.runCommand("ping").ok' | mongosh localhost:27017/test --quiet
 
 volumes:
   sqlvolume:
