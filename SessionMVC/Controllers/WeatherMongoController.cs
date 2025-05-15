@@ -1,4 +1,4 @@
-using Microsoft.AspNetCore.Mvc;
+﻿using Microsoft.AspNetCore.Mvc;
 using Session.Services.Models.DTOs;
 using Session.Services.Resolvers;
 using Session.Services.Services.Interfaces;
@@ -7,11 +7,11 @@ namespace SessionMVC.Controllers;
 
 [ApiController]
 [Route("[controller]")]
-public class WeatherForecastController(ForecastResolvers forecastResolvers) : ControllerBase
+public class WeatherMongoController(ForecastResolvers forecastResolvers) : ControllerBase
 {
-    readonly IForecastService service = forecastResolvers("sql");
+    readonly IForecastService service = forecastResolvers("mongo");
 
-    [HttpGet(Name = "GetWeatherForecast")]
+    [HttpGet(Name = "GetWeatherMongoForecast")]
     public WeatherForecastDto Get()
     {
         return service.GetForecast();

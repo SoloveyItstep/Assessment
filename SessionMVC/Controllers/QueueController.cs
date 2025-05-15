@@ -1,5 +1,5 @@
 ﻿using Microsoft.AspNetCore.Mvc;
-using SessionMVC.Services;
+using Session.Services.Services.Interfaces;
 
 namespace SessionMVC.Controllers;
 

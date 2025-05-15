@@ -1,10 +1,11 @@
 using log4net;
 using Microsoft.AspNetCore.Mvc;
-using SessionMVC.Context;
+using Session.Persistence.Contexts;
 using SessionMVC.Models;
 using System.Diagnostics;
 
 namespace SessionMVC.Controllers;
+
 public class HomeController : Controller
 {
     private readonly ILog _logger;
@@ -38,7 +39,7 @@ public class HomeController : Controller
             HttpContext.Session.CommitAsync().GetAwaiter().GetResult();
         }
 
-        var id = base.HttpContext.Session.Id;
+        var id = HttpContext.Session.Id;
         return Ok(new { id });
     }
 
