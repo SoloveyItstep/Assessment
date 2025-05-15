@@ -1,22 +1,12 @@
-using log4net;
 using Microsoft.AspNetCore.Mvc;
-using Session.Persistence.Contexts;
+using Session.Services.Services.Interfaces;
 using SessionMVC.Models;
 using System.Diagnostics;
 
 namespace SessionMVC.Controllers;
 
-public class HomeController : Controller
+public class HomeController(IHealthcheckSqlService healthcheckSqlService) : Controller
 {
-    private readonly ILog _logger;
-    private readonly AssessmentDbContext _context;
-
-    public HomeController(ILog logger, AssessmentDbContext context)
-    {
-        _logger = logger;
-        _context = context;
-    }
-
     public IActionResult Index()
     {
         return View();
@@ -52,9 +42,7 @@ public class HomeController : Controller
 
     public async Task<IActionResult> DbCheck()
     {
-        var result = await _context.Database.CanConnectAsync();
-        var message = $"Database connection status: {result}";
-        _logger.Info(message);
+        var result = await healthcheckSqlService.DatabaseCheck();
 
         return Ok(new { status = result });
     }

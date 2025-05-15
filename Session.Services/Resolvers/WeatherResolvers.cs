@@ -3,6 +3,6 @@ using Session.Services.Services.Interfaces;
 
 namespace Session.Services.Resolvers;
 
-public delegate IWeatherRepository WeatherResolvers(string type);
+public delegate IWeatherMongoRepository WeatherResolvers(string type);
 
-public delegate IForecastService ForecastResolvers(string type);
+public delegate IWeatherMongoService ForecastResolvers(string type);

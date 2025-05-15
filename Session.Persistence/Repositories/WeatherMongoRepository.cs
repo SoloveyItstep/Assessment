@@ -1,21 +1,18 @@
-﻿using AutoMapper;
-using Microsoft.Extensions.Logging;
+﻿using Microsoft.Extensions.Logging;
 using MongoDB.Bson;
 using MongoDB.Driver;
 using Session.Application.Repositories;
-using Session.Domain.Models;
 using Session.Domain.Models.Mongo;
 
 namespace Session.Persistence.Repositories;
-public class WeatherMongoRepository(IMongoDatabase mongoDatabase, ILogger<WeatherMongoRepository> logger, IMapper mapper) : IWeatherRepository
+public class WeatherMongoRepository(IMongoDatabase mongoDatabase, ILogger<WeatherMongoRepository> logger) : IWeatherMongoRepository
 {
-    public int CreateForecast(WeatherForecast forecast)
+    public int CreateForecast(WeatherForecastMongoDB forecast)
     {
         try
         {
-            var forecastMongoDB = mapper.Map<WeatherForecastMongoDB>(forecast);
             var collection = mongoDatabase.GetCollection<WeatherForecastMongoDB>("WeatherForecasts");
-            collection.InsertOne(forecastMongoDB);
+            collection.InsertOne(forecast);
 
             return 1;
         }
@@ -23,19 +20,19 @@ public class WeatherMongoRepository(IMongoDatabase mongoDatabase, ILogger<Weathe
         {
             logger.LogError(ex, "create error");
         }
+
         return 0;
     }
 
-    public WeatherForecast? GetForecastByDate(DateOnly date)
+    public async Task<WeatherForecastMongoDB?> GetForecastByDate(DateOnly date)
     {
         try
         {
             var collection = mongoDatabase.GetCollection<WeatherForecastMongoDB>("WeatherForecasts");
             var filter = Builders<WeatherForecastMongoDB>.Filter.Eq("Date", date);
-            var forecast = collection.Find(filter).FirstOrDefault();
-            var result = mapper.Map<WeatherForecast>(forecast);
-
-            return result;
+            var filterResult = await collection.FindAsync(filter);
+            
+            return await filterResult.FirstOrDefaultAsync();
         }
         catch (Exception ex)
         {
@@ -45,15 +42,20 @@ public class WeatherMongoRepository(IMongoDatabase mongoDatabase, ILogger<Weathe
         return null;
     }
 
-    public List<Summary> GetSummaries()
+    public async Task<List<SummaryMongoDB>> GetSummaries()
     {
         try
         {
             var collection = mongoDatabase.GetCollection<SummaryMongoDB>("Summarys");
-            var summaries = collection.Find(new BsonDocument()).ToList();
-            var result = mapper.Map<List<Summary>>(summaries);
+            var filter = new BsonDocument();
+            var sort = Builders<SummaryMongoDB>.Sort.Ascending("state");
+            var options = new FindOptions<SummaryMongoDB>
+            {
+                Sort = sort
+            };
+            var summariesCursor = await collection.FindAsync(filter, options);
 
-            return result;
+            return await summariesCursor.ToListAsync();
         }
         catch (Exception ex)
         {

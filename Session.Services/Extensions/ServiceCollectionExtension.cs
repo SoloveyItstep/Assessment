@@ -5,10 +5,9 @@ using Microsoft.Extensions.DependencyInjection;
 using MongoDB.Driver;
 using Session.Application.Repositories;
 using Session.Persistence.Contexts;
-using Session.Persistence.Mapping;
 using Session.Persistence.Repositories;
+using Session.Services.Mapping;
 using Session.Services.Middleware;
-using Session.Services.Resolvers;
 using Session.Services.Services;
 using Session.Services.Services.Interfaces;
 using SessionMVC.Middleware;
@@ -36,29 +35,14 @@ public static class ServiceCollectionExtension
         services.AddTransient<IQueueRepository, QueueRepository>();
         services.AddTransient<IQueueService, QueueService>();
 
-        services.AddTransient<WeatherSqlRepository>();
-        services.AddTransient<WeatherMongoRepository>();
-        services.AddTransient<ForecastMongoService>();
-        services.AddTransient<ForecastSqlService>();
+        services.AddTransient<IWeatherSqlRepository, WeatherSqlRepository>();
+        services.AddTransient<IWeatherSqlService, WeatherSqlService>();
 
-        services.AddTransient<WeatherResolvers>(sp => type =>
-        {
-            return type switch
-            {
-                "sql" => sp.GetRequiredService<WeatherSqlRepository>(),
-                "mongo" => sp.GetRequiredService<WeatherMongoRepository>(),
-                _ => throw new ArgumentException($"Invalid repository type: {type}")
-            };
-        });
-        services.AddTransient<ForecastResolvers>(sp => type =>
-        {
-            return type switch
-            {
-                "sql" => sp.GetRequiredService<ForecastSqlService>(),
-                "mongo" => sp.GetRequiredService<ForecastMongoService>(),
-                _ => throw new ArgumentException($"Invalid service type: {type}")
-            };
-        });
+        services.AddTransient<IWeatherMongoRepository, WeatherMongoRepository>();
+        services.AddTransient<IWeatherMongoService, WeatherMongoService>();
+
+        services.AddTransient<IHealthcheckSqlRepository, HealthcheckSqlRepository>();
+        services.AddTransient<IHealthcheckSqlService, HealthcheckSqlService>();
 
         services.AddAutoMapper(typeof(ForecastMappingProfile));
 

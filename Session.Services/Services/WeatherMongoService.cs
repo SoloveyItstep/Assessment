@@ -1,26 +1,24 @@
 ﻿using AutoMapper;
 using Session.Application.Repositories;
-using Session.Domain.Models;
+using Session.Domain.Models.Mongo;
 using Session.Services.Models.DTOs;
-using Session.Services.Resolvers;
 using Session.Services.Services.Interfaces;
 
 namespace Session.Services.Services;
 
-public class ForecastSqlService(WeatherResolvers resolver, IMapper mapper) : IForecastService
+public class WeatherMongoService(IWeatherMongoRepository repository, IMapper mapper) : IWeatherMongoService
 {
-    readonly IWeatherRepository repository = resolver("sql");
     readonly IMapper mapper = mapper;
 
-    public WeatherForecastDto GetForecast()
+    public async Task<WeatherForecastDto> GetForecast()
     {
         DateOnly date = DateOnly.FromDateTime(DateTime.Now);
-        var forecast = repository.GetForecastByDate(date);
+        var forecast = await repository.GetForecastByDate(date);
 
         if (forecast == null)
         {
-            var summaries = repository.GetSummaries();
-            forecast = new WeatherForecast
+            var summaries = await repository.GetSummaries();
+            forecast = new WeatherForecastMongoDB
             {
                 Date = date,
                 TemperatureC = Random.Shared.Next(-20, 55),

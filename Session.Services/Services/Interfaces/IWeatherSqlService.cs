@@ -2,7 +2,7 @@
 
 namespace Session.Services.Services.Interfaces;
 
-public interface IForecastService
+public interface IWeatherSqlService
 {
-    WeatherForecastDto GetForecast();
+    Task<WeatherForecastDto> GetForecast();
 }

@@ -1,27 +1,4 @@
 ﻿services:
-  sessionmvc:
-    image: ${DOCKER_REGISTRY-}sessionmvc
-    build:
-      context: .
-      dockerfile: SessionMVC/Dockerfile
-    environment:
-      - ASPNETCORE_ENVIRONMENT=Development
-      - ConnectionStrings__AssessmentDbConnectionString=Server=db;Database=Assessment;User=sa;Password=Your_password123;Encrypt=True;TrustServerCertificate=True
-      - MongoConnectionString=mongodb://host.docker.internal:27017/27017?directConnection=true
-    ports:
-      - "8081:5000" # Прокидаємо порт 5000 (HTTP) з контейнера на порт 8081 хост-машини
-    depends_on:
-      db:
-        condition: service_healthy
-        restart: true
-      rabbitmq:
-        condition: service_healthy
-      mongo:
-        condition: service_healthy
-    networks:
-      - devnetwork
-    restart: unless-stopped
-    
   db:
     image: mcr.microsoft.com/mssql/server:2022-latest
     container_name: mssql
@@ -76,6 +53,29 @@
       ME_CONFIG_MONGODB_URL: mongodb://127.0.0.1:27017/27017?directConnection=true
     healthcheck:
       test: echo 'db.runCommand("ping").ok' | mongosh localhost:27017/test --quiet
+  
+  sessionmvc:
+    image: ${DOCKER_REGISTRY-}sessionmvc
+    build:
+      context: .
+      dockerfile: SessionMVC/Dockerfile
+    environment:
+      - ASPNETCORE_ENVIRONMENT=Development
+      - ConnectionStrings__AssessmentDbConnectionString=Server=db;Database=Assessment;User=sa;Password=Your_password123;Encrypt=True;TrustServerCertificate=True
+      - MongoConnectionString=mongodb://host.docker.internal:27017/27017?directConnection=true
+    ports:
+      - "8081:5000" # Прокидаємо порт 5000 (HTTP) з контейнера на порт 8081 хост-машини
+    depends_on:
+      db:
+        condition: service_healthy
+        restart: true
+      rabbitmq:
+        condition: service_healthy
+      mongo:
+        condition: service_healthy
+    networks:
+      - devnetwork
+    restart: unless-stopped
 
 volumes:
   sqlvolume:

@@ -1,19 +1,16 @@
 using Microsoft.AspNetCore.Mvc;
 using Session.Services.Models.DTOs;
-using Session.Services.Resolvers;
 using Session.Services.Services.Interfaces;
 
 namespace SessionMVC.Controllers;
 
 [ApiController]
 [Route("[controller]")]
-public class WeatherForecastController(ForecastResolvers forecastResolvers) : ControllerBase
+public class WeatherForecastController(IWeatherMongoService service) : ControllerBase
 {
-    readonly IForecastService service = forecastResolvers("sql");
-
     [HttpGet(Name = "GetWeatherForecast")]
-    public WeatherForecastDto Get()
+    public async Task<WeatherForecastDto> Get()
     {
-        return service.GetForecast();
+        return await service.GetForecast();
     }
 }

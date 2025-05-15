@@ -1,32 +1,31 @@
 ﻿using AutoMapper;
+using Microsoft.EntityFrameworkCore;
 using Session.Application.Repositories;
-using Session.Domain.Models;
+using Session.Domain.Models.SQL;
 using Session.Services.Models.DTOs;
-using Session.Services.Resolvers;
 using Session.Services.Services.Interfaces;
 
 namespace Session.Services.Services;
 
-public class ForecastMongoService(WeatherResolvers resolver, IMapper mapper) : IForecastService
+public class WeatherSqlService(IWeatherSqlRepository repository, IMapper mapper) : IWeatherSqlService
 {
-    readonly IWeatherRepository repository = resolver("mongo");
     readonly IMapper mapper = mapper;
 
-    public WeatherForecastDto GetForecast()
+    public async Task<WeatherForecastDto> GetForecast()
     {
         DateOnly date = DateOnly.FromDateTime(DateTime.Now);
-        var forecast = repository.GetForecastByDate(date);
+        var forecast = await repository.GetForecastByDate(date);
 
         if (forecast == null)
         {
-            var summaries = repository.GetSummaries();
-            forecast = new WeatherForecast
+            var summaries = await repository.GetSummaries().ToListAsync();
+            forecast = new WeatherForecastSql
             {
                 Date = date,
                 TemperatureC = Random.Shared.Next(-20, 55),
                 Summary = summaries[Random.Shared.Next(summaries.Count)].State
             };
-            repository.CreateForecast(forecast);
+            await repository.CreateForecast(forecast);
         }
 
         return mapper.Map<WeatherForecastDto>(forecast);

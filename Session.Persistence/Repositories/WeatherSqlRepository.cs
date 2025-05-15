@@ -1,8 +1,7 @@
-﻿using AutoMapper;
+﻿using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging;
 using MongoDB.Driver;
 using Session.Application.Repositories;
-using Session.Domain.Models;
 using Session.Domain.Models.SQL;
 using Session.Persistence.Contexts;
 
@@ -13,17 +12,15 @@ namespace Session.Persistence.Repositories;
 /// </summary>
 public class WeatherSqlRepository(
     AssessmentDbContext context,
-    IMapper mapper,
-    ILogger<WeatherSqlRepository> logger) : IWeatherRepository
+    ILogger<WeatherSqlRepository> logger) : IWeatherSqlRepository
 {
-    public int CreateForecast(WeatherForecast forecast)
+    public async Task<int> CreateForecast(WeatherForecastSql forecast)
     {
         try
         {
-            var model = mapper.Map<WeatherForecastSql>(forecast);
-            context.WeatherForecasts.Add(model);
+            context.WeatherForecasts.Add(forecast);
 
-            return context.SaveChanges();
+            return await context.SaveChangesAsync();
         }
         catch (Exception ex)
         {
@@ -33,13 +30,11 @@ public class WeatherSqlRepository(
         return 0;
     }
 
-    public WeatherForecast? GetForecastByDate(DateOnly date)
+    public async Task<WeatherForecastSql?> GetForecastByDate(DateOnly date)
     {
         try
         {
-            var forecast = context.WeatherForecasts.SingleOrDefault(x => x.Date == date);
-
-            return mapper.Map<WeatherForecast>(forecast);
+            return await context.WeatherForecasts.SingleOrDefaultAsync(x => x.Date == date);
         }
         catch (Exception ex)
         {
@@ -49,19 +44,17 @@ public class WeatherSqlRepository(
         return null;
     }
 
-    public List<Summary> GetSummaries()
+    public IQueryable<SummarySql> GetSummaries()
     {
         try
         {
-            var summaries = mapper.Map<List<Summary>>(context.Summarys);
-
-            return [.. summaries];
+            return context.Summarys.AsQueryable();
         }
         catch (Exception ex)
         {
             logger.LogError(ex, "Error message");
         }
 
-        return [];
+        return Array.Empty<SummarySql>().AsQueryable();
     }
 }
