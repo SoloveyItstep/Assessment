@@ -27,15 +27,13 @@ build_solution:
     - dotnet restore "${SOLUTION_FILE}"
     - echo "Building solution ${SOLUTION_FILE} in Release configuration..."
     - dotnet build "${SOLUTION_FILE}" --configuration Release --no-restore
+    # Якщо ви хочете перевірити вміст директорії після білду, робіть це тут:
+    - echo "Checking artifacts path after build:"
+    - ls -la "${SESSION_MVC_DIR}/bin/Release/net9.0/"
   artifacts:
     paths:
-      # Шлях до артефактів основного проекту. Переконайтеся, що назва папки SessionMVC 
-      # (велика/мала літера 's') відповідає тому, як вона є у вашому репозиторії.
-      # На GitHub вона "SessionMVC".
-      - echo "Checking artifacts path:"
-      - ls -la ${SESSION_MVC_DIR}/bin/Release/net9.0/
-
-      #- "${SESSION_MVC_DIR}/bin/Release/net9.0/"
+      # Правильний шлях до артефактів, який раніше знаходив 345 файлів
+      - "${SESSION_MVC_DIR}/bin/Release/net9.0/"
     expire_in: 1 hour
 
 run_tests:
