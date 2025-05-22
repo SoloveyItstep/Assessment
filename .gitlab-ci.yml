@@ -5,37 +5,49 @@ variables:
   GIT_TRACE: "true"
   GIT_CURL_VERBOSE: "true"
   SOLUTION_FILE: "Assessment.sln"
-  SESSION_MVC_DIR: "SessionMVC"
-  TEST_PROJECT_DIR: "Session.UnitTests"
+  # Використовуємо змінні для директорій проектів для більшої гнучкості
+  SESSION_MVC_DIR: "SessionMVC" # Назва директорії вашого основного веб-проекту
+  TEST_PROJECT_DIR: "Session.UnitTests" # Назва директорії вашого тестового проекту
+  # Повний шлях до .csproj файлу тестового проекту
   TEST_PROJECT_CSPROJ_PATH: "${TEST_PROJECT_DIR}/Session.UnitTests.csproj"
 
 stages:
   - build
-  # - test # Тимчасово вимкнемо тести для простоти
+  - test
 
 before_script:
   - echo "Using .NET SDK $(dotnet --version)"
   - dotnet --info
-  # - echo "Attempting to clone from $CI_REPOSITORY_URL" # Клонування зараз не головне для цього тесту
+  - echo "Attempting to clone from $CI_REPOSITORY_URL"
 
-build_solution: # Назва залишається, але суть змінюється для тесту
+build_solution:
   stage: build
   script:
-    - echo "This is a test artifact content" > my_simple_artifact.txt
-    - echo "Test artifact created."
-    - ls -l my_simple_artifact.txt # Перевіряємо, чи файл створено
+    - echo "Restoring NuGet packages for solution ${SOLUTION_FILE}..."
+    - dotnet restore "${SOLUTION_FILE}"
+    - echo "Building solution ${SOLUTION_FILE} in Release configuration..."
+    - dotnet build "${SOLUTION_FILE}" --configuration Release --no-restore
   artifacts:
     paths:
-      - my_simple_artifact.txt # Завантажуємо тільки цей простий файл
+      # Шлях до артефактів основного проекту. Переконайтеся, що назва папки SessionMVC 
+      # (велика/мала літера 's') відповідає тому, як вона є у вашому репозиторії.
+      # На GitHub вона "SessionMVC".
+      - echo "Checking artifacts path:"
+      - ls -la ${SESSION_MVC_DIR}/bin/Release/net9.0/
+
+      #- "${SESSION_MVC_DIR}/bin/Release/net9.0/"
     expire_in: 1 hour
 
-# run_tests: # Тимчасово вимкнемо етап тестів
-#   stage: test
-#   needs: [build_solution]
-#   script:
-#     - echo "Running tests for ${TEST_PROJECT_CSPROJ_PATH}..."
-#     - dotnet test "${TEST_PROJECT_CSPROJ_PATH}" --configuration Release --no-build --logger "trx;LogFileName=test_results.trx"
-#   artifacts:
-#     when: always
-#     reports:
-#       junit: "${TEST_PROJECT_DIR}/TestResults/test_results.trx"
+run_tests:
+  stage: test
+  needs: [build_solution]
+  script:
+    - echo "Running tests for ${TEST_PROJECT_CSPROJ_PATH}..."
+    # Команда dotnet test створить папку TestResults всередині директорії TEST_PROJECT_DIR
+    - dotnet test "${TEST_PROJECT_CSPROJ_PATH}" --configuration Release --no-build --logger "trx;LogFileName=test_results.trx"
+  artifacts:
+    when: always
+    reports:
+      # Правильний шлях до TRX файлу для JUnit звіту.
+      # Він має бути відносним до кореня проекту.
+      junit: "${TEST_PROJECT_DIR}/TestResults/test_results.trx"
