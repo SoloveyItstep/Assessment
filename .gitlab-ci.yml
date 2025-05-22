@@ -1,13 +1,15 @@
-image: mcr.microsoft.com/dotnet/sdk:9.0 # Або 8.0, як обговорювалося раніше, якщо 9.0 не є строгою вимогою
+image: mcr.microsoft.com/dotnet/sdk:9.0
 
 variables:
-  GIT_STRATEGY: clone # Можна спробувати 'fetch', якщо 'clone' постійно не вдається
-  GIT_TRACE: "true"   # Вмикає детальне логування команд Git
-  GIT_CURL_VERBOSE: "true" # Вмикає детальне логування для HTTP-операцій Git
-  # Шляхи до файлів проектів відносно кореня репозиторію
+  GIT_STRATEGY: clone
+  GIT_TRACE: "true"
+  GIT_CURL_VERBOSE: "true"
   SOLUTION_FILE: "Assessment.sln"
-  SESSION_MVC_PROJECT_PATH: "SessionMVC/SessionMVC.csproj"
-  TEST_PROJECT_PATH: "Session.UnitTests/Session.UnitTests.csproj"
+  # Використовуємо змінні для директорій проектів для більшої гнучкості
+  SESSION_MVC_DIR: "SessionMVC" # Назва директорії вашого основного веб-проекту
+  TEST_PROJECT_DIR: "Session.UnitTests" # Назва директорії вашого тестового проекту
+  # Повний шлях до .csproj файлу тестового проекту
+  TEST_PROJECT_CSPROJ_PATH: "${TEST_PROJECT_DIR}/Session.UnitTests.csproj"
 
 stages:
   - build
@@ -16,7 +18,7 @@ stages:
 before_script:
   - echo "Using .NET SDK $(dotnet --version)"
   - dotnet --info
-  - echo "Attempting to clone from $CI_REPOSITORY_URL" # Ця змінна містить URL, який використовується для клонування
+  - echo "Attempting to clone from $CI_REPOSITORY_URL"
 
 build_solution:
   stage: build
@@ -27,17 +29,22 @@ build_solution:
     - dotnet build "${SOLUTION_FILE}" --configuration Release --no-restore
   artifacts:
     paths:
-      - sessionMVC/bin/Release/net9.0/
-      # - sessionMVC/obj/Release/net9.0/
+      # Шлях до артефактів основного проекту. Переконайтеся, що назва папки SessionMVC 
+      # (велика/мала літера 's') відповідає тому, як вона є у вашому репозиторії.
+      # На GitHub вона "SessionMVC".
+      - "${SESSION_MVC_DIR}/bin/Release/net9.0/"
     expire_in: 1 hour
 
 run_tests:
   stage: test
   needs: [build_solution]
   script:
-    - echo "Running tests for ${TEST_PROJECT_PATH}..."
-    - dotnet test "${TEST_PROJECT_PATH}" --configuration Release --no-build --logger "trx;LogFileName=test_results.trx"
+    - echo "Running tests for ${TEST_PROJECT_CSPROJ_PATH}..."
+    # Команда dotnet test створить папку TestResults всередині директорії TEST_PROJECT_DIR
+    - dotnet test "${TEST_PROJECT_CSPROJ_PATH}" --configuration Release --no-build --logger "trx;LogFileName=test_results.trx"
   artifacts:
     when: always
     reports:
-      junit: "${TEST_PROJECT_PATH}/TestResults/test_results.trx"
+      # Правильний шлях до TRX файлу для JUnit звіту.
+      # Він має бути відносним до кореня проекту.
+      junit: "${TEST_PROJECT_DIR}/TestResults/test_results.trx"
