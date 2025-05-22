@@ -32,7 +32,8 @@ build_solution:
       # Шлях до артефактів основного проекту. Переконайтеся, що назва папки SessionMVC 
       # (велика/мала літера 's') відповідає тому, як вона є у вашому репозиторії.
       # На GitHub вона "SessionMVC".
-      - "${SESSION_MVC_DIR}/bin/Release/net9.0/"
+      #- "${SESSION_MVC_DIR}/bin/Release/net9.0/"
+      - "Assessment.sln"
     expire_in: 1 hour
 
 run_tests:
