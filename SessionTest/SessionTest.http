@@ -1,6 +1,0 @@
-@SessionTest_HostAddress = http://localhost:5027
-
-GET {{SessionTest_HostAddress}}/weatherforecast/
-Accept: application/json
-
-###
