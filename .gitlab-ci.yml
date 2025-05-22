@@ -27,8 +27,8 @@ build_solution:
     - dotnet build "${SOLUTION_FILE}" --configuration Release --no-restore
   artifacts:
     paths:
-      - sessionMVC/bin/Release/
-      - sessionMVC/obj/Release/
+      - sessionMVC/bin/Release/net9.0/
+      # - sessionMVC/obj/Release/net9.0/
     expire_in: 1 hour
 
 run_tests:
