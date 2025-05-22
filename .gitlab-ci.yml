@@ -1,17 +1,23 @@
 image: mcr.microsoft.com/dotnet/sdk:9.0
 
 stages:
-  - build
+  - build_and_artifact_test
 
-build_solution:
-  stage: build
+simple_artifact_job:
+  stage: build_and_artifact_test
+  tags: # Переконайтеся, що ці теги відповідають тегам Runner'а
+    - docker
+    # - dotnet 
   script:
-    - echo "This is a test artifact content" > my_simple_artifact.txt
-    - ls -l my_simple_artifact.txt
+    - echo "GitLab CI/CD Test - Creating a simple artifact"
+    - echo "This is a test artifact content." > test_artifact.txt
+    - echo "File created:"
+    - ls -l test_artifact.txt
   artifacts:
     paths:
-      - my_simple_artifact.txt
+      - test_artifact.txt
     expire_in: 1 hour
+    when: on_success # Завантажувати артефакти тільки при успішному виконанні завдання
 
 
 # image: mcr.microsoft.com/dotnet/sdk:9.0
