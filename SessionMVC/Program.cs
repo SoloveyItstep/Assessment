@@ -43,7 +43,7 @@ builder.WebHost.ConfigureKestrel(serverOptions =>
 builder.Services.AddRazorPages();
 
 //builder.WebHost.UseUrls("http://*:5000;https://*:5001;http://*:80;https://*:443;http://*:8080");
-var connectionString = builder.Configuration.GetConnectionString("AssessmentDbConnectionString");
+var connectionString = builder.Configuration.GetConnectionString("AssessmentDbConnectionString") ?? string.Empty;
 
 Console.WriteLine($"Connection string: {connectionString}");
 builder.Services.AddSessionServices(connectionString);
