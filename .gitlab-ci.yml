@@ -1,0 +1,44 @@
+image: mcr.microsoft.com/dotnet/sdk:9.0
+
+stages:
+  - build
+  - test
+  # - code_style # Додамо пізніше, якщо потрібно
+
+variables:
+  # Шляхи до файлів проектів відносно кореня репозиторію
+  SOLUTION_FILE: "Assessment.sln"
+  SESSION_MVC_PROJECT_PATH: "sessionMVC/sessionMVC.csproj" # Шлях до основного проекту
+  TEST_PROJECT_PATH: "Session.UnitTests/Session.UnitTests.csproj" # Шлях до тестового проекту
+
+before_script:
+  - echo "Using .NET SDK $(dotnet --version)"
+  - dotnet --info # Покаже детальну інформацію про SDK
+
+build_solution:
+  stage: build
+  script:
+    - echo "Restoring NuGet packages for solution ${SOLUTION_FILE}..."
+    - dotnet restore "${SOLUTION_FILE}"
+    - echo "Building solution ${SOLUTION_FILE} in Release configuration..."
+    - dotnet build "${SOLUTION_FILE}" --configuration Release --no-restore
+  artifacts:
+    paths:
+      # Зберігаємо артефакти збірки, якщо вони потрібні для наступних етапів або для завантаження
+      # Наприклад, для sessionMVC:
+      - sessionMVC/bin/Release/
+      - sessionMVC/obj/Release/ # Можливо, не потрібно для obj, але може бути корисним
+    expire_in: 1 hour
+
+run_tests:
+  stage: test
+  needs: [build_solution] # Запускати тільки після успішної збірки
+  script:
+    - echo "Running tests for ${TEST_PROJECT_PATH}..."
+    # --no-build, оскільки ми вже зібрали все на етапі build_solution
+    - dotnet test "${TEST_PROJECT_PATH}" --configuration Release --no-build --logger "trx;LogFileName=test_results.trx"
+  artifacts:
+    when: always # Збирати звіти про тести завжди
+    reports:
+      junit: "${TEST_PROJECT_PATH}/TestResults/test_results.trx" # Шлях відносно кореня проекту
+      # GitLab автоматично конвертує TRX у формат JUnit для відображення в UI
