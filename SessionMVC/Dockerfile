@@ -10,7 +10,7 @@ COPY Session.Application/Session.Application.csproj ./Session.Application/
 COPY Session.Domain/Session.Domain.csproj ./Session.Domain/
 COPY Session.Persistence/Session.Persistence.csproj ./Session.Persistence/
 COPY Session.Services/Session.Services.csproj ./Session.Services/
-# Session.UnitTests.csproj копіювати для образу додатка не потрібно
+COPY Session.UnitTests/Session.UnitTests.csproj ./Session.UnitTests/
 
 # Відновлюємо залежності для всього рішення
 RUN dotnet restore "Assessment.sln"
