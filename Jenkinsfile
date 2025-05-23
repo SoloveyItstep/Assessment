@@ -67,7 +67,7 @@ pipeline {
             steps {
                 script {
                     echo 'Running the SessionMVC Docker image...'
-                    sh "docker run -d -p 8081:5000 --name sessionmvc-run-${env.BUILD_NUMBER} sessionmvc-app:${env.BUILD_NUMBER}"
+                    sh "docker run --rm -d -p 8081:5000 --name sessionmvc-run-${env.BUILD_NUMBER} sessionmvc-app:${env.BUILD_NUMBER}"
                     echo "SessionMVC app should be running on http://localhost:8081"
                     sh "sleep 20" // Даємо час на перевірку
                     echo "Stopping and removing the SessionMVC container..."
