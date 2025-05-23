@@ -68,7 +68,7 @@ services:
       - ASPNETCORE_ENVIRONMENT=Development
       # ASPNETCORE_HTTP_PORTS=5000 # Тепер встановлюється у SessionMVC/Dockerfile
       - ConnectionStrings__AssessmentDbConnectionString=Server=db;Database=Assessment;User=sa;Password=Your_password123;Encrypt=False;TrustServerCertificate=True
-      - MongoConnectionString=mongodb://mongo:27017/YourActualMongoDbName?directConnection=true # ЗАМІНІТЬ YourActualMongoDbName
+      - MongoConnectionString=mongodb://mongo:27017/27017?directConnection=true # ЗАМІНІТЬ YourActualMongoDbName
     ports:
       - "8081:5000" # УЗГОДЖЕНО: порт 5000 контейнера на порт 8081 хоста
     depends_on:
