@@ -1,5 +1,5 @@
 ﻿**/.classpath
-**/.dockerignore 
+**/.dockerignore
 **/.env
 **/.git
 **/.gitignore
@@ -14,19 +14,23 @@
 **/azds.yaml
 **/bin
 **/charts
-# Порядок важливий: спочатку виключення з правила, потім саме правило
-!docker-compose.dcproj  # <--- ДОДАЙТЕ ЦЕЙ РЯДОК (або переконайтеся, що він є ПЕРЕД наступним)
-**/docker-compose* # Це правило тепер не зачепить docker-compose.dcproj
-**/Dockerfile*
-**/node_modules
+
+# Дозволяємо docker-compose.dcproj
+!docker-compose.dcproj
+
+# Ігноруємо інші файли, що починаються з docker-compose (наприклад, docker-compose.yml, docker-compose.override.yml)
+# Якщо ви хочете, щоб ці файли були в контексті, закоментуйте або видаліть наступний рядок
+**/docker-compose* **/Dockerfile* **/node_modules
 **/npm-debug.log
 **/obj
 **/secrets.dev.yaml
 **/values.dev.yaml
 LICENSE
 README.md
+
+# Не ігнорувати деякі файли .git, якщо вони потрібні для визначення версії тощо (зазвичай не потрібно для простої збірки)
 !**/.gitignore
-!.git/HEAD
-!.git/config
-!.git/packed-refs
-!.git/refs/heads/**
+# !.git/HEAD
+# !.git/config
+# !.git/packed-refs
+# !.git/refs/heads/**
