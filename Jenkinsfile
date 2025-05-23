@@ -80,12 +80,9 @@ pipeline {
     }
     post {
         always {
-            agent { label 'master' }  // або будь-який інший доступний агент
-            steps {
-                echo 'Pipeline finished. Processing post-build actions...'
-                junit allowEmptyResults: true, testResults: 'TestResults/testresults.trx'
-                recordIssues tool: msBuild(), ignoreQualityGate: true, failOnError: false
-            }
+            echo 'Pipeline finished. Processing post-build actions...'
+            junit allowEmptyResults: true, testResults: 'TestResults/testresults.trx'
+            recordIssues tool: msBuild(), ignoreQualityGate: true, failOnError: false
         }
         success {
             echo 'Pipeline succeeded!'
