@@ -73,15 +73,10 @@ pipeline {
     } // Кінець stages
     post {
         always {
-            // Блок post зазвичай виконується на агенті останнього виконаного етапу
-            // або на контролері, якщо були проблеми з агентами.
-            // Явно вказуємо, що ці кроки мають виконуватися на вузлі з робочою областю
-            // для доступу до артефактів, таких як звіти тестів.
-            node { 
-                echo 'Pipeline finished.'
-                junit allowEmptyResults: true, testResults: 'TestResults/testresults.trx'
-                recordIssues tool: msBuild(), ignoreQualityGate: true, failOnError: false
-            }
+            // Кроки в post-секції виконуються в контексті, який має доступ до робочої області
+            echo 'Pipeline finished.'
+            junit allowEmptyResults: true, testResults: 'TestResults/testresults.trx'
+            recordIssues tool: msBuild(), ignoreQualityGate: true, failOnError: false
         }
         success {
             echo 'Pipeline succeeded!'
