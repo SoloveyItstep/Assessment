@@ -1,6 +1,5 @@
-!Session.UnitTests/Session.UnitTests.csproj
-**/.classpath
-**/.dockerignore
+﻿**/.classpath
+**/.dockerignore 
 **/.env
 **/.git
 **/.gitignore
@@ -15,7 +14,9 @@
 **/azds.yaml
 **/bin
 **/charts
-**/docker-compose*
+# Порядок важливий: спочатку виключення з правила, потім саме правило
+!docker-compose.dcproj  # <--- ДОДАЙТЕ ЦЕЙ РЯДОК (або переконайтеся, що він є ПЕРЕД наступним)
+**/docker-compose* # Це правило тепер не зачепить docker-compose.dcproj
 **/Dockerfile*
 **/node_modules
 **/npm-debug.log
