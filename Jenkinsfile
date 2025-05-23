@@ -24,17 +24,19 @@ pipeline {
                 sh 'dotnet build Assessment.sln --configuration Release --no-restore'
             }
         }
-        stage('Test') { // Цей етап спрацює, якщо у вас є тестові проекти в рішенні
+        stage('Test') {
             steps {
                 echo 'Running tests...'
-                sh 'dotnet test Assessment.sln --no-build --configuration Release --logger "trx;LogFileName=testresults.trx"'
+                // Додаємо --results-directory, щоб результати зберігалися в папку TestResults у корені робочої області
+                sh 'dotnet test Assessment.sln --no-build --configuration Release --logger "trx;LogFileName=testresults.trx" --results-directory ./TestResults'
             }
         }
     }
     post {
         always {
             echo 'Pipeline finished.'
-            junit allowEmptyResults: true, testResults: '**/TestResults/testresults.trx' // <--- ЗМІНЕНО ТУТ
+            // Вказуємо точніший шлях до файлу результатів тестів
+            junit allowEmptyResults: true, testResults: 'TestResults/testresults.trx' 
             recordIssues tool: msBuild(), ignoreQualityGate: true, failOnError: false
         }
         success {
