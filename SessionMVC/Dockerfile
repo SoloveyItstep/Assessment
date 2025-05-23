@@ -13,6 +13,7 @@ COPY Session.Persistence/Session.Persistence.csproj ./Session.Persistence/
 COPY Session.Services/Session.Services.csproj ./Session.Services/
 COPY Session.UnitTests/Session.UnitTests.csproj ./Session.UnitTests/ # Додано копіювання UnitTests проєкту
 COPY docker-compose.dcproj ./docker-compose.dcproj/ # Додано копіювання dcproj, якщо він потрібен для restore
+COPY .dockerignore ./.dockerignore/
 
 # Відновлюємо залежності для всього рішення
 RUN dotnet restore "Assessment.sln"
