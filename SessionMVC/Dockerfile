@@ -26,7 +26,7 @@ RUN dotnet publish "SessionMVC.csproj" -c $BUILD_CONFIGURATION -o /app/publish /
 # Етап 2: Запуск додатку
 FROM mcr.microsoft.com/dotnet/aspnet:9.0 AS final
 WORKDIR /app
-COPY --from=publish /app/publish .
+COPY --from=build /app/publish .
 
 # Явно вказуємо ASP.NET Core слухати на порту 5000 для HTTP
 ENV ASPNETCORE_HTTP_PORTS=5000
