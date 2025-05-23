@@ -27,16 +27,39 @@ pipeline {
         stage('Test') {
             steps {
                 echo 'Running tests...'
-                // Додаємо --results-directory, щоб результати зберігалися в папку TestResults у корені робочої області
                 sh 'dotnet test Assessment.sln --no-build --configuration Release --logger "trx;LogFileName=testresults.trx" --results-directory ./TestResults'
+            }
+        }
+        stage('Build App Docker Image') {
+            steps {
+                echo 'Building Docker image for SessionMVC...'
+                script {
+                    // Збираємо Docker-образ, вказуючи шлях до Dockerfile та контекст збірки
+                    // -f SessionMVC/Dockerfile  <-- вказує на ваш Dockerfile
+                    // .                         <-- контекст збірки (корінь репозиторію)
+                    def appImage = docker.build("sessionmvc-app:${env.BUILD_NUMBER}", "-f SessionMVC/Dockerfile .") 
+                }
+            }
+        }
+        stage('Run App Docker Image (Test)') {
+            steps {
+                echo 'Running the SessionMVC Docker image...'
+                script {
+                    sh "docker run -d -p 8081:8080 --name sessionmvc-run-${env.BUILD_NUMBER} sessionmvc-app:${env.BUILD_NUMBER}"
+                    echo "SessionMVC app should be running on http://localhost:8081"
+                    echo "Container will run for a short period for testing and then be stopped."
+                    sh "sleep 20" 
+                    sh "docker stop sessionmvc-run-${env.BUILD_NUMBER}"
+                    sh "docker rm sessionmvc-run-${env.BUILD_NUMBER}"
+                    echo "SessionMVC container stopped and removed."
+                }
             }
         }
     }
     post {
         always {
             echo 'Pipeline finished.'
-            // Вказуємо точніший шлях до файлу результатів тестів
-            junit allowEmptyResults: true, testResults: 'TestResults/testresults.trx' 
+            junit allowEmptyResults: true, testResults: 'TestResults/testresults.trx'
             recordIssues tool: msBuild(), ignoreQualityGate: true, failOnError: false
         }
         success {
