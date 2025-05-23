@@ -1,4 +1,4 @@
-﻿services:
+services:
   db:
     image: mcr.microsoft.com/mssql/server:2022-latest
     container_name: mssql
@@ -20,55 +20,60 @@
       interval: 10s
       timeout: 5s
       retries: 10
-   
+    
   rabbitmq:
-    image: rabbitmq:4.1-management
+    image: rabbitmq:3-management # Розгляньте можливість використання більш конкретного тегу
     container_name: rabbitmq
-    tty: true
     hostname: rabbitmq
     environment:
       RABBITMQ_DEFAULT_USER: "guest"
       RABBITMQ_DEFAULT_PASS: "guest"
-      RABBITMQ_SERVER_ADDITIONAL_ERL_ARGS: -rabbitmq_stream advertised_host localhost
     healthcheck:
       test: rabbitmq-diagnostics -q ping
-      interval: 5s
-      timeout: 15s
-      retries: 3
+      interval: 10s 
+      timeout: 10s
+      retries: 5
     ports:
       - "5672:5672"
       - "15672:15672"
-      - "5552:5552"
- 
+      - "5552:5552" 
+    volumes:
+      - rabbitmq_data:/var/lib/rabbitmq 
+    networks:
+      - devnetwork
+    restart: unless-stopped
 
   mongo:
-    image: mongo
+    image: mongo:latest # Розгляньте можливість використання більш конкретного тегу
     restart: always
+    container_name: mongo
     ports:
-      - 27017:27017
+      - "27017:27017"
     environment:
-      ME_CONFIG_MONGODB_ADMINUSERNAME: root
-      ME_CONFIG_MONGODB_ADMINPASSWORD: example
-      ME_CONFIG_BASICAUTH: false
-      ME_CONFIG_MONGODB_URL: mongodb://127.0.0.1:27017/27017?directConnection=true
+      MONGO_INITDB_ROOT_USERNAME: root 
+      MONGO_INITDB_ROOT_PASSWORD: example
+    volumes:
+      - mongo_data:/data/db 
     healthcheck:
       test: echo 'db.runCommand("ping").ok' | mongosh localhost:27017/test --quiet
-  
+    networks:
+      - devnetwork
+    
   sessionmvc:
-    image: ${DOCKER_REGISTRY-}sessionmvc
+    image: sessionmvc 
     build:
       context: .
-      dockerfile: SessionMVC/Dockerfile
+      dockerfile: SessionMVC/Dockerfile 
     environment:
       - ASPNETCORE_ENVIRONMENT=Development
-      - ConnectionStrings__AssessmentDbConnectionString=Server=db;Database=Assessment;User=sa;Password=Your_password123;Encrypt=True;TrustServerCertificate=True
-      - MongoConnectionString=mongodb://host.docker.internal:27017/27017?directConnection=true
+      # ASPNETCORE_HTTP_PORTS=5000 # Тепер встановлюється у SessionMVC/Dockerfile
+      - ConnectionStrings__AssessmentDbConnectionString=Server=db;Database=Assessment;User=sa;Password=Your_password123;Encrypt=False;TrustServerCertificate=True
+      - MongoConnectionString=mongodb://mongo:27017/27017?directConnection=true # ЗАМІНІТЬ YourActualMongoDbName
     ports:
-      - "8081:5000" # Прокидаємо порт 5000 (HTTP) з контейнера на порт 8081 хост-машини
+      - "8081:5000" # УЗГОДЖЕНО: порт 5000 контейнера на порт 8081 хоста
     depends_on:
       db:
         condition: service_healthy
-        restart: true
       rabbitmq:
         condition: service_healthy
       mongo:
@@ -79,6 +84,8 @@
 
 volumes:
   sqlvolume:
+  rabbitmq_data:
+  mongo_data:
     
 networks:
   devnetwork:
