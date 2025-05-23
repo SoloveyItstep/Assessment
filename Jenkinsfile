@@ -80,12 +80,11 @@ pipeline {
     }
     post {
         always {
-            agent { label 'master' } 
-            steps { 
-                echo 'Pipeline finished. Processing post-build actions...'
-                junit allowEmptyResults: true, testResults: 'TestResults/testresults.trx'
-                recordIssues tool: msBuild(), ignoreQualityGate: true, failOnError: false
-            }
+            // Прибираємо явний агент звідси, post-кроки мають успадкувати контекст
+            // або виконатися на контролері, який має доступ до робочої області.
+            echo 'Pipeline finished. Processing post-build actions...'
+            junit allowEmptyResults: true, testResults: 'TestResults/testresults.trx'
+            recordIssues tool: msBuild(), ignoreQualityGate: true, failOnError: false
         }
         success {
             echo 'Pipeline succeeded!'
