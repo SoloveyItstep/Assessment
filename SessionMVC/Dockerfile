@@ -4,7 +4,6 @@ ARG BUILD_CONFIGURATION=Release
 WORKDIR /src
 
 # Копіюємо .sln та всі .csproj файли для надійного відновлення залежностей
-# Це важливо, якщо SessionMVC має залежності від інших проектів у рішенні
 COPY Assessment.sln .
 COPY SessionMVC/SessionMVC.csproj ./SessionMVC/
 COPY Session.Application/Session.Application.csproj ./Session.Application/
@@ -31,9 +30,9 @@ COPY --from=build /app/publish .
 # Явно вказуємо ASP.NET Core слухати на порту 5000 для HTTP
 # Це узгоджується з вашим launchSettings.json ("Container (Dockerfile)") та Program.cs
 ENV ASPNETCORE_HTTP_PORTS=5000
-# Якщо ви плануєте HTTPS на іншому порту (наприклад, 5001, як у локальному launchSettings), 
-# і він налаштований у Program.cs, ви можете додати:
-# ENV ASPNETCORE_HTTPS_PORTS=5001
+# Якщо ви плануєте HTTPS на іншому порту, налаштуйте ASPNETCORE_HTTPS_PORTS та відповідний EXPOSE
+# Наприклад, якщо ваш Program.cs також слухає HTTPS на 5001:
+# ENV ASPNETCORE_HTTPS_PORTS=5001 
 # EXPOSE 5001
 
 EXPOSE 5000 # Експонуємо порт, на якому додаток фактично слухає
