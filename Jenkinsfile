@@ -45,7 +45,7 @@ pipeline {
                 steps {
                     echo 'Running the SessionMVC Docker image...'
                     script {
-                        // Прокидаємо порт 5000 контейнера на порт 8081 хоста
+                        // Прокидаємо порт 5000 контейнера (де слухає додаток) на порт 8081 хоста
                         sh "docker run -d -p 8081:5000 --name sessionmvc-run-${env.BUILD_NUMBER} sessionmvc-app:${env.BUILD_NUMBER}"
                         echo "SessionMVC app should be running on http://localhost:8081"
                         echo "Container will run for a short period for testing and then be stopped."
