@@ -5,14 +5,15 @@ WORKDIR /src
 
 # Копіюємо .sln та всі необхідні .csproj файли
 # Переконайтеся, що всі проєкти, на які посилається Assessment.sln, тут перераховані
+# і шляхи до них відносно кореня репозиторію вказані правильно.
 COPY Assessment.sln .
 COPY SessionMVC/SessionMVC.csproj ./SessionMVC/
 COPY Session.Application/Session.Application.csproj ./Session.Application/
 COPY Session.Domain/Session.Domain.csproj ./Session.Domain/
 COPY Session.Persistence/Session.Persistence.csproj ./Session.Persistence/
 COPY Session.Services/Session.Services.csproj ./Session.Services/
-COPY Session.UnitTests/Session.UnitTests.csproj ./Session.UnitTests/ # Додано копіювання UnitTests проєкту
-COPY docker-compose.dcproj ./docker-compose.dcproj/ # Додано копіювання dcproj, якщо він потрібен для restore
+COPY Session.UnitTests/Session.UnitTests.csproj ./Session.UnitTests/ 
+COPY docker-compose.dcproj . 
 
 # Відновлюємо залежності для всього рішення
 RUN dotnet restore "Assessment.sln"
