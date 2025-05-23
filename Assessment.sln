@@ -6,6 +6,10 @@ MinimumVisualStudioVersion = 10.0.40219.1
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "SessionMVC", "SessionMVC\SessionMVC.csproj", "{661D961F-C795-4C29-BCD4-A7FB265DAC02}"
 EndProject
 Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "Session", "Session", "{BB4043A9-76BB-4511-97E6-89F0BA80F785}"
+	ProjectSection(SolutionItems) = preProject
+		.dockerignore = .dockerignore
+		SessionMVC\Dockerfile = SessionMVC\Dockerfile
+	EndProjectSection
 EndProject
 Project("{E53339B2-1760-4266-BCC7-CA923CBCF16C}") = "docker-compose", "docker-compose.dcproj", "{81DDED9D-158B-E303-5F62-77A2896D2A5A}"
 EndProject
