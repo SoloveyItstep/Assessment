@@ -15,12 +15,14 @@
 **/bin
 **/charts
 
-# Дозволяємо docker-compose.dcproj
+# Ігноруємо файли, що починаються з docker-compose (включно з .yml і .override.yml)
+**/docker-compose*
+**/Dockerfile*
+**/node_modules
+
+# Але залишаємо docker-compose.dcproj у контексті
 !docker-compose.dcproj
 
-# Ігноруємо інші файли, що починаються з docker-compose (наприклад, docker-compose.yml, docker-compose.override.yml)
-# Якщо ви хочете, щоб ці файли були в контексті, закоментуйте або видаліть наступний рядок
-**/docker-compose* **/Dockerfile* **/node_modules
 **/npm-debug.log
 **/obj
 **/secrets.dev.yaml
