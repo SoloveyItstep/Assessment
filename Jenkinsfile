@@ -34,11 +34,8 @@ pipeline {
     post {
         always {
             echo 'Pipeline finished.'
-            // Збереження результатів тестування (якщо є)
-            junit allowEmptyResults: true, testResults: '**/*.trx'
-            recordIssues tool: msBuild(), ignoreQualityGate: true, failOnError: false // failingDisabled: true - щоб збірка не падала через попередження
-            // Очищення робочої області
-            // cleanWs()
+            junit allowEmptyResults: true, testResults: '**/TestResults/testresults.trx' // <--- ЗМІНЕНО ТУТ
+            recordIssues tool: msBuild(), ignoreQualityGate: true, failOnError: false
         }
         success {
             echo 'Pipeline succeeded!'
