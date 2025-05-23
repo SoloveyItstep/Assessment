@@ -50,7 +50,7 @@ pipeline {
                     try {
                         echo "Current directory: ${sh(script: 'pwd', returnStdout: true).trim()}"
                         echo "Workspace contents:"
-                        sh 'ls -la'
+                        sh 'ls -la' 
                         
                         def appImage = docker.build("sessionmvc-app:${env.BUILD_NUMBER}", "-f SessionMVC/Dockerfile .")
                         echo "Successfully built Docker image: ${appImage.id}"
@@ -80,8 +80,8 @@ pipeline {
     }
     post {
         always {
-            agent { label 'master' } // ВИПРАВЛЕНО: Повертаємо агента для post-дій
-            steps { // ВИПРАВЛЕНО: Обгортаємо кроки в steps
+            agent { label 'master' } 
+            steps { 
                 echo 'Pipeline finished. Processing post-build actions...'
                 junit allowEmptyResults: true, testResults: 'TestResults/testresults.trx'
                 recordIssues tool: msBuild(), ignoreQualityGate: true, failOnError: false
@@ -95,3 +95,4 @@ pipeline {
         }
     }
 }
+
