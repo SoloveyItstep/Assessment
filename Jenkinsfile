@@ -36,6 +36,7 @@ pipeline {
             echo 'Pipeline finished.'
             // Збереження результатів тестування (якщо є)
             junit allowEmptyResults: true, testResults: '**/*.trx'
+            recordIssues tool: msBuild(), failingDisabled: true // failingDisabled: true - щоб збірка не падала через попередження
             // Очищення робочої області
             // cleanWs()
         }
