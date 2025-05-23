@@ -44,9 +44,10 @@ builder.Services.AddRazorPages();
 
 //builder.WebHost.UseUrls("http://*:5000;https://*:5001;http://*:80;https://*:443;http://*:8080");
 var connectionString = builder.Configuration.GetConnectionString("AssessmentDbConnectionString") ?? string.Empty;
+var mongoConnectionString = builder.Configuration.GetConnectionString("MongoConnectionString") ?? string.Empty;
 
 Console.WriteLine($"Connection string: {connectionString}");
-builder.Services.AddSessionServices(connectionString);
+builder.Services.AddSessionServices(connectionString, mongoConnectionString);
 
 builder.Services.AddDistributedMemoryCache();
 builder.Services.AddHttpContextAccessor();

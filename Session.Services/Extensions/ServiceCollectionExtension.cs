@@ -16,10 +16,10 @@ namespace Session.Services.Extensions;
 
 public static class ServiceCollectionExtension
 {
-    public static IServiceCollection AddSessionServices(this IServiceCollection services, string connectionString)
+    public static IServiceCollection AddSessionServices(this IServiceCollection services, string connectionString, string mongoConnectionString)
     {
-        var MongoDbUri = Environment.GetEnvironmentVariable("MongoConnectionString");
-        services.AddSingleton(new MongoClient(MongoDbUri).GetDatabase("Assessment"));
+        //var MongoDbUri = Environment.GetEnvironmentVariable("MongoConnectionString");
+        services.AddSingleton(new MongoClient(mongoConnectionString).GetDatabase("Assessment"));
 
         services.AddDbContext<AssessmentDbContext>(options => {
             options.UseSqlServer(connectionString);
