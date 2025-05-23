@@ -11,8 +11,6 @@ Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "Session", "Session", "{BB40
 		Dockerfile = Dockerfile
 	EndProjectSection
 EndProject
-Project("{E53339B2-1760-4266-BCC7-CA923CBCF16C}") = "docker-compose", "docker-compose.dcproj", "{81DDED9D-158B-E303-5F62-77A2896D2A5A}"
-EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Session.Domain", "Session.Domain\Session.Domain.csproj", "{579C15FB-6A9C-462B-B899-73897A973A1D}"
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Session.Application", "Session.Application\Session.Application.csproj", "{12493662-E843-4F4A-A250-92D618E82640}"
