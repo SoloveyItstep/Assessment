@@ -1,11 +1,11 @@
 pipeline {
-    agent none // Глобального агента не визначаємо
+    agent none
+
     stages {
         stage('.NET Build and Test') {
             agent {
-                docker { 
+                docker {
                     image 'mcr.microsoft.com/dotnet/sdk:9.0'
-                    // args '-u root' // Розкоментуйте, якщо потрібно
                 }
             }
             stages {
@@ -37,22 +37,22 @@ pipeline {
         }
 
         stage('Build App Docker Image') {
-            agent { label 'master' } // Явно вказуємо виконувати на Jenkins контролері
+            agent { label 'master' }
             steps {
                 echo 'DEBUG: Current PATH on agent for Docker Build:'
                 sh 'echo $PATH'
                 echo 'DEBUG: Attempting to find docker command:'
-                sh 'which docker' 
-                sh 'docker --version' 
-                
+                sh 'which docker'
+                sh 'docker --version'
+
                 echo 'Building Docker image for SessionMVC...'
                 script {
                     try {
                         echo "Current directory: ${sh(script: 'pwd', returnStdout: true).trim()}"
                         echo "Workspace contents:"
-                        sh 'ls -la' 
-                        
-                        docker.build("sessionmvc-app:${env.BUILD_NUMBER}", "-f Dockerfile .")
+                        sh 'ls -la'
+
+                        def appImage = docker.build("sessionmvc-app:${env.BUILD_NUMBER}", "-f Dockerfile .")
                         echo "Successfully built Docker image: ${appImage.id}"
                     } catch (e) {
                         echo "Error during docker.build: ${e.toString()}"
@@ -63,13 +63,13 @@ pipeline {
         }
 
         stage('Run App Docker Image (Test)') {
-            agent { label 'master' } 
+            agent { label 'master' }
             steps {
                 script {
                     echo 'Running the SessionMVC Docker image...'
-                    sh "docker run --rm -d -p 8081:5000 --name sessionmvc-run-${env.BUILD_NUMBER} sessionmvc-app:${env.BUILD_NUMBER}"
+                    sh "docker run -d -p 8081:5000 --name sessionmvc-run-${env.BUILD_NUMBER} sessionmvc-app:${env.BUILD_NUMBER}"
                     echo "SessionMVC app should be running on http://localhost:8081"
-                    sh 'for i in {1..10}; do curl -sSf http://localhost:8081 || sleep 2; done'
+                    sh "sleep 10"
                     echo "Stopping and removing the SessionMVC container..."
                     sh "docker stop sessionmvc-run-${env.BUILD_NUMBER}"
                     sh "docker rm sessionmvc-run-${env.BUILD_NUMBER}"
@@ -78,6 +78,7 @@ pipeline {
             }
         }
     }
+
     post {
         always {
             node('master') {
@@ -86,12 +87,5 @@ pipeline {
                 recordIssues tool: msBuild(), ignoreQualityGate: true, failOnError: false
             }
         }
-        success {
-            echo 'Pipeline succeeded!'
-        }
-        failure {
-            echo 'Pipeline failed!'
-        }
     }
 }
-
