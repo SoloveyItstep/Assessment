@@ -52,7 +52,7 @@ pipeline {
                         echo "Workspace contents:"
                         sh 'ls -la' 
                         
-                        def appImage = docker.build("sessionmvc-app:${env.BUILD_NUMBER}", "-f SessionMVC/Dockerfile .")
+                        docker.build("sessionmvc-app:${env.BUILD_NUMBER}", "-f Dockerfile .")
                         echo "Successfully built Docker image: ${appImage.id}"
                     } catch (e) {
                         echo "Error during docker.build: ${e.toString()}"
@@ -80,11 +80,11 @@ pipeline {
     }
     post {
         always {
-            // Прибираємо явний агент звідси, post-кроки мають успадкувати контекст
-            // або виконатися на контролері, який має доступ до робочої області.
-            echo 'Pipeline finished. Processing post-build actions...'
-            junit allowEmptyResults: true, testResults: 'TestResults/testresults.trx'
-            recordIssues tool: msBuild(), ignoreQualityGate: true, failOnError: false
+            node {
+                echo 'Pipeline finished. Processing post-build actions...'
+                junit allowEmptyResults: true, testResults: 'TestResults/testresults.trx'
+                recordIssues tool: msBuild(), ignoreQualityGate: true, failOnError: false
+            }
         }
         success {
             echo 'Pipeline succeeded!'
