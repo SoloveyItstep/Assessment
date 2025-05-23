@@ -48,7 +48,6 @@ pipeline {
                 echo 'Building Docker image for SessionMVC...'
                 script {
                     try {
-                        // ВИПРАВЛЕНО: Правильна інтерполяція для Groovy
                         echo "Current directory: ${sh(script: 'pwd', returnStdout: true).trim()}"
                         echo "Workspace contents:"
                         sh 'ls -la'
@@ -81,9 +80,12 @@ pipeline {
     }
     post {
         always {
-            echo 'Pipeline finished. Processing post-build actions...'
-            junit allowEmptyResults: true, testResults: 'TestResults/testresults.trx'
-            recordIssues tool: msBuild(), ignoreQualityGate: true, failOnError: false
+            agent { label 'master' } // ВИПРАВЛЕНО: Повертаємо агента для post-дій
+            steps { // ВИПРАВЛЕНО: Обгортаємо кроки в steps
+                echo 'Pipeline finished. Processing post-build actions...'
+                junit allowEmptyResults: true, testResults: 'TestResults/testresults.trx'
+                recordIssues tool: msBuild(), ignoreQualityGate: true, failOnError: false
+            }
         }
         success {
             echo 'Pipeline succeeded!'
