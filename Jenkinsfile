@@ -42,19 +42,20 @@ pipeline {
             }
         }
         stage('Run App Docker Image (Test)') {
-            steps {
-                echo 'Running the SessionMVC Docker image...'
-                script {
-                    sh "docker run -d -p 8081:8080 --name sessionmvc-run-${env.BUILD_NUMBER} sessionmvc-app:${env.BUILD_NUMBER}"
-                    echo "SessionMVC app should be running on http://localhost:8081"
-                    echo "Container will run for a short period for testing and then be stopped."
-                    sh "sleep 20" 
-                    sh "docker stop sessionmvc-run-${env.BUILD_NUMBER}"
-                    sh "docker rm sessionmvc-run-${env.BUILD_NUMBER}"
-                    echo "SessionMVC container stopped and removed."
+                steps {
+                    echo 'Running the SessionMVC Docker image...'
+                    script {
+                        // Прокидаємо порт 5000 контейнера на порт 8081 хоста
+                        sh "docker run -d -p 8081:5000 --name sessionmvc-run-${env.BUILD_NUMBER} sessionmvc-app:${env.BUILD_NUMBER}"
+                        echo "SessionMVC app should be running on http://localhost:8081"
+                        echo "Container will run for a short period for testing and then be stopped."
+                        sh "sleep 20" 
+                        sh "docker stop sessionmvc-run-${env.BUILD_NUMBER}"
+                        sh "docker rm sessionmvc-run-${env.BUILD_NUMBER}"
+                        echo "SessionMVC container stopped and removed."
+                    }
                 }
             }
-        }
     }
     post {
         always {
