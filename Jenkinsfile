@@ -48,9 +48,10 @@ pipeline {
                 echo 'Building Docker image for SessionMVC...'
                 script {
                     try {
-                        echo "Current directory: $(sh(script: 'pwd', returnStdout: true).trim())"
+                        // ВИПРАВЛЕНО: Правильна інтерполяція для Groovy
+                        echo "Current directory: ${sh(script: 'pwd', returnStdout: true).trim()}"
                         echo "Workspace contents:"
-                        sh 'ls -la' // ВИПРАВЛЕНО: команда ls тепер в sh ''
+                        sh 'ls -la'
                         
                         def appImage = docker.build("sessionmvc-app:${env.BUILD_NUMBER}", "-f SessionMVC/Dockerfile .")
                         echo "Successfully built Docker image: ${appImage.id}"
@@ -80,19 +81,15 @@ pipeline {
     }
     post {
         always {
-            // Кроки в post-секції виконуються в контексті, який має доступ до робочої області.
-            // Якщо потрібен конкретний агент, його можна вказати тут, але для junit/recordIssues
-            // зазвичай достатньо контексту останнього агента або контролера.
             echo 'Pipeline finished. Processing post-build actions...'
             junit allowEmptyResults: true, testResults: 'TestResults/testresults.trx'
             recordIssues tool: msBuild(), ignoreQualityGate: true, failOnError: false
         }
         success {
-            echo 'Pipeline succeeded!' // ВИПРАВЛЕНО: прибрано зайвий steps {}
+            echo 'Pipeline succeeded!'
         }
         failure {
-            echo 'Pipeline failed!' // ВИПРАВЛЕНО: прибрано зайвий steps {}
+            echo 'Pipeline failed!'
         }
     }
 }
-
