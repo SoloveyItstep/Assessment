@@ -37,45 +37,40 @@ pipeline {
         }
 
         stage('Build App Docker Image') {
-            agent { label 'master' } // Явно вказуємо виконувати на Jenkins контролері (припускаючи, що його мітка 'master')
+            agent { label 'master' } // Явно вказуємо виконувати на Jenkins контролері
             steps {
                 echo 'DEBUG: Current PATH on agent for Docker Build:'
                 sh 'echo $PATH'
                 echo 'DEBUG: Attempting to find docker command:'
-                sh 'which docker || echo "docker not found by which"'
-                sh 'docker --version || echo "docker --version failed"'
+                sh 'which docker' 
+                sh 'docker --version' 
                 
                 echo 'Building Docker image for SessionMVC...'
                 script {
                     try {
-                        // Переконуємося, що робоча область доступна
-                        // pwd() покаже поточну директорію
-                        sh 'pwd' 
-                        ls -la // Покаже вміст робочої області
+                        echo "Current directory: $(sh(script: 'pwd', returnStdout: true).trim())"
+                        echo "Workspace contents:"
+                        sh 'ls -la' // ВИПРАВЛЕНО: команда ls тепер в sh ''
                         
-                        // Збираємо образ
                         def appImage = docker.build("sessionmvc-app:${env.BUILD_NUMBER}", "-f SessionMVC/Dockerfile .")
                         echo "Successfully built Docker image: ${appImage.id}"
                     } catch (e) {
                         echo "Error during docker.build: ${e.toString()}"
-                        currentBuild.result = 'FAILURE'
-                        error "Failed to build Docker image"
+                        error "Failed to build Docker image: ${e.getMessage()}"
                     }
                 }
             }
         }
 
         stage('Run App Docker Image (Test)') {
-            agent { label 'master' } // Також на контролері
+            agent { label 'master' } 
             steps {
-                echo 'Running the SessionMVC Docker image...'
                 script {
-                    // Перевіряємо, чи існує образ, зібраний на попередньому етапі
-                    sh "docker images sessionmvc-app:${env.BUILD_NUMBER}"
-
+                    echo 'Running the SessionMVC Docker image...'
                     sh "docker run -d -p 8081:5000 --name sessionmvc-run-${env.BUILD_NUMBER} sessionmvc-app:${env.BUILD_NUMBER}"
                     echo "SessionMVC app should be running on http://localhost:8081"
-                    sh "sleep 20" 
+                    sh "sleep 20" // Даємо час на перевірку
+                    echo "Stopping and removing the SessionMVC container..."
                     sh "docker stop sessionmvc-run-${env.BUILD_NUMBER}"
                     sh "docker rm sessionmvc-run-${env.BUILD_NUMBER}"
                     echo "SessionMVC container stopped and removed."
@@ -85,23 +80,19 @@ pipeline {
     }
     post {
         always {
-            // Явно вказуємо вузол для виконання post-build дій, щоб мати доступ до робочої області
-            agent { label 'master' } 
-            steps {
-                echo 'Pipeline finished. Archiving test results...'
-                junit allowEmptyResults: true, testResults: 'TestResults/testresults.trx'
-                recordIssues tool: msBuild(), ignoreQualityGate: true, failOnError: false
-            }
+            // Кроки в post-секції виконуються в контексті, який має доступ до робочої області.
+            // Якщо потрібен конкретний агент, його можна вказати тут, але для junit/recordIssues
+            // зазвичай достатньо контексту останнього агента або контролера.
+            echo 'Pipeline finished. Processing post-build actions...'
+            junit allowEmptyResults: true, testResults: 'TestResults/testresults.trx'
+            recordIssues tool: msBuild(), ignoreQualityGate: true, failOnError: false
         }
         success {
-            steps {
-                echo 'Pipeline succeeded!'
-            }
+            echo 'Pipeline succeeded!' // ВИПРАВЛЕНО: прибрано зайвий steps {}
         }
         failure {
-            steps {
-                echo 'Pipeline failed!'
-            }
+            echo 'Pipeline failed!' // ВИПРАВЛЕНО: прибрано зайвий steps {}
         }
     }
 }
+
