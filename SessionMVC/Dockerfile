@@ -3,19 +3,21 @@ FROM mcr.microsoft.com/dotnet/sdk:9.0 AS build
 ARG BUILD_CONFIGURATION=Release
 WORKDIR /src
 
-# Копіюємо .sln та всі .csproj файли для надійного відновлення залежностей
+# Копіюємо .sln та всі необхідні .csproj файли
+# Переконайтеся, що всі проєкти, на які посилається Assessment.sln, тут перераховані
 COPY Assessment.sln .
 COPY SessionMVC/SessionMVC.csproj ./SessionMVC/
 COPY Session.Application/Session.Application.csproj ./Session.Application/
 COPY Session.Domain/Session.Domain.csproj ./Session.Domain/
 COPY Session.Persistence/Session.Persistence.csproj ./Session.Persistence/
 COPY Session.Services/Session.Services.csproj ./Session.Services/
-COPY Session.UnitTests/Session.UnitTests.csproj ./Session.UnitTests/
+COPY Session.UnitTests/Session.UnitTests.csproj ./Session.UnitTests/ # Додано копіювання UnitTests проєкту
+COPY docker-compose.dcproj ./docker-compose.dcproj/ # Додано копіювання dcproj, якщо він потрібен для restore
 
 # Відновлюємо залежності для всього рішення
 RUN dotnet restore "Assessment.sln"
 
-# Копіюємо весь інший код проєкту
+# Копіюємо весь інший код проєкту (після restore, щоб використати кешування)
 COPY . .
 
 # Публікуємо додаток SessionMVC
@@ -25,15 +27,10 @@ RUN dotnet publish "SessionMVC.csproj" -c $BUILD_CONFIGURATION -o /app/publish /
 # Етап 2: Запуск додатку
 FROM mcr.microsoft.com/dotnet/aspnet:9.0 AS final
 WORKDIR /app
-COPY --from=build /app/publish .
+COPY --from=publish /app/publish .
 
 # Явно вказуємо ASP.NET Core слухати на порту 5000 для HTTP
-# Це узгоджується з вашим launchSettings.json ("Container (Dockerfile)") та Program.cs
 ENV ASPNETCORE_HTTP_PORTS=5000
-# Якщо ви плануєте HTTPS на іншому порту, налаштуйте ASPNETCORE_HTTPS_PORTS та відповідний EXPOSE
-# Наприклад, якщо ваш Program.cs також слухає HTTPS на 5001:
-# ENV ASPNETCORE_HTTPS_PORTS=5001 
-# EXPOSE 5001
 
 EXPOSE 5000 # Експонуємо порт, на якому додаток фактично слухає
 
