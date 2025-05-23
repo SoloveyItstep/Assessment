@@ -80,9 +80,11 @@ pipeline {
     }
     post {
         always {
-            echo 'Pipeline finished. Processing post-build actions...'
-            junit allowEmptyResults: true, testResults: 'TestResults/testresults.trx'
-            recordIssues tool: msBuild(), ignoreQualityGate: true, failOnError: false
+            node('master') {
+                echo 'Pipeline finished. Processing post-build actions...'
+                junit allowEmptyResults: true, testResults: 'TestResults/testresults.trx'
+                recordIssues tool: msBuild(), ignoreQualityGate: true, failOnError: false
+            }
         }
         success {
             echo 'Pipeline succeeded!'
