@@ -3,7 +3,7 @@ services:
     image: mcr.microsoft.com/mssql/server:2022-latest
     container_name: mssql
     environment:
-      SA_PASSWORD: "Your_password123"
+      SA_PASSWORD: "Your_password123" # Розгляньте можливість використання .env файлу або Docker secrets
       ACCEPT_EULA: "Y"
     ports:
       - "1433:1433"
@@ -13,23 +13,20 @@ services:
       - devnetwork
     restart: unless-stopped
     healthcheck:
-      test: [
-        "CMD-SHELL",
-        "/opt/mssql-tools18/bin/sqlcmd -S localhost -U sa -P Your_password123 -N -C -Q \"SELECT 1\""
-      ]
+      test: ["CMD-SHELL", "/opt/mssql-tools18/bin/sqlcmd -S localhost -U sa -P Your_password123 -N -C -Q \"SELECT 1\" || exit 1"]
       interval: 10s
       timeout: 5s
       retries: 10
     
   rabbitmq:
-    image: rabbitmq:3-management # Розгляньте можливість використання більш конкретного тегу
+    image: rabbitmq:3.12-management # Рекомендовано використовувати конкретну версію
     container_name: rabbitmq
     hostname: rabbitmq
     environment:
       RABBITMQ_DEFAULT_USER: "guest"
       RABBITMQ_DEFAULT_PASS: "guest"
     healthcheck:
-      test: rabbitmq-diagnostics -q ping
+      test: ["CMD", "rabbitmq-diagnostics", "-q", "ping"]
       interval: 10s 
       timeout: 10s
       retries: 5
@@ -44,14 +41,14 @@ services:
     restart: unless-stopped
 
   mongo:
-    image: mongo:latest # Розгляньте можливість використання більш конкретного тегу
+    image: mongo:7.0 # Рекомендовано використовувати конкретну версію
     restart: always
     container_name: mongo
     ports:
       - "27017:27017"
     environment:
       MONGO_INITDB_ROOT_USERNAME: root 
-      MONGO_INITDB_ROOT_PASSWORD: example
+      MONGO_INITDB_ROOT_PASSWORD: example # Розгляньте можливість використання .env файлу або Docker secrets
     volumes:
       - mongo_data:/data/db 
     healthcheck:
@@ -60,17 +57,17 @@ services:
       - devnetwork
     
   sessionmvc:
-    image: sessionmvc 
+    image: sessionmvc # Цей образ буде зібрано локально, якщо не знайдено
     build:
       context: .
-      dockerfile: SessionMVC/Dockerfile 
+      dockerfile: Dockerfile # ВИПРАВЛЕНО: Dockerfile тепер у корені
     environment:
       - ASPNETCORE_ENVIRONMENT=Development
-      # ASPNETCORE_HTTP_PORTS=5000 # Тепер встановлюється у SessionMVC/Dockerfile
+      # ASPNETCORE_HTTP_PORTS=5000 # Встановлюється у Dockerfile
       - ConnectionStrings__AssessmentDbConnectionString=Server=db;Database=Assessment;User=sa;Password=Your_password123;Encrypt=False;TrustServerCertificate=True
-      - MongoConnectionString=mongodb://mongo:27017/27017?directConnection=true # ЗАМІНІТЬ YourActualMongoDbName
+      - MongoConnectionString=mongodb://mongo:27017/Assessment?directConnection=true # ЗАМІНІТЬ 'Assessment' на вашу БД Mongo, якщо потрібно
     ports:
-      - "8081:5000" # УЗГОДЖЕНО: порт 5000 контейнера на порт 8081 хоста
+      - "8081:5000" 
     depends_on:
       db:
         condition: service_healthy
