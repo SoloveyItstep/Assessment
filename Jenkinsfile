@@ -3,16 +3,20 @@ pipeline {
 
   environment {
     DOCKER_IMAGE = 'sessionmvc-app:latest'
+    // потрібна змінна для mount в docker/compose:
+    WORKSPACE = "${env.WORKSPACE}"
   }
 
   stages {
+
     stage('Checkout') {
       steps {
-        git url: 'https://github.com/SoloveyItstep/Assessment.git', branch: 'master'
+        checkout scm
       }
     }
 
-    stage('Restore & Build') {
+    stage('Build & Test') {
+      // збірка + тести у контейнері .NET
       agent {
         docker {
           image 'mcr.microsoft.com/dotnet/sdk:9.0'
@@ -20,34 +24,29 @@ pipeline {
         }
       }
       steps {
+        // Відновлення і збірка
         sh 'dotnet restore Assessment.sln'
-        sh 'dotnet build  Assessment.sln --configuration Release --no-restore'
-      }
-    }
+        sh 'dotnet build Assessment.sln --configuration Release --no-restore'
 
-    stage('Test') {
-      agent {
-        docker {
-          image 'mcr.microsoft.com/dotnet/sdk:9.0'
-          args  '-v /var/run/docker.sock:/var/run/docker.sock'
-        }
-      }
-      steps {
+        // Запуск тестів у TRX
         sh '''
           dotnet test Assessment.sln \
             --no-build --configuration Release \
             --logger "trx;LogFileName=testresults.trx" \
-            --results-directory ./TestResults
+            --results-directory TestResults
         '''
-        sh 'rm -rf TestResults/*.xml TestResults/*.xml*/'
+
+        // Конвертація TRX → JUnit-XML
+        sh 'mkdir -p TestResults && rm -f TestResults/*.xml'
         sh '''
           export PATH="$PATH:$HOME/.dotnet/tools"
           if ! command -v trx2junit >/dev/null 2>&1; then
             dotnet tool install --global trx2junit
           fi
-          trx2junit ./TestResults/testresults.trx
+          trx2junit TestResults/testresults.trx
         '''
-        sh 'ls -la TestResults'
+
+        // Публікація в Jenkins
         junit 'TestResults/*.xml'
       }
     }
@@ -60,8 +59,14 @@ pipeline {
 
     stage('Start Dependencies') {
       steps {
-        // замінили -d на --detach
-        sh 'docker compose up --detach'
+        // Піднімаємо залежності з docker-compose.yml через офіційний образ
+        sh '''
+          docker run --rm \
+            -v /var/run/docker.sock:/var/run/docker.sock \
+            -v "$WORKSPACE":/workspace \
+            -w /workspace \
+            docker/compose:latest up -d
+        '''
       }
     }
 
@@ -74,10 +79,18 @@ pipeline {
 
   post {
     always {
+      // Зупиняємо та видаляємо контейнер додатку
       sh 'docker stop sessionmvc_container || true'
-      sh 'docker rm   sessionmvc_container || true'
-      // опціонально, щоб зачистити залежності:
-      // sh 'docker compose down || true'
+      sh 'docker rm   sessionmvc_container   || true'
+
+      // Прибираємо залежності через той самий образ compose
+      sh '''
+        docker run --rm \
+          -v /var/run/docker.sock:/var/run/docker.sock \
+          -v "$WORKSPACE":/workspace \
+          -w /workspace \
+          docker/compose:latest down || true
+      '''
     }
   }
 }
