@@ -1,8 +1,6 @@
 // Визначаємо допоміжні функції Groovy тут, ПОЗА блоком pipeline {}
-// Їх можна буде викликати з блоку environment або з script блоків.
 def determineDeployEnvironment(String branchName) {
     if (branchName == null || branchName.isEmpty() || branchName == "null") {
-        // Якщо ім'я гілки не визначено, повертаємо дефолтне або обробляємо як помилку
         echo "WARNING: Branch name is null or empty in determineDeployEnvironment. Defaulting to FeatureBranch."
         return 'FeatureBranch' 
     }
@@ -11,7 +9,7 @@ def determineDeployEnvironment(String branchName) {
     } else if (branchName == 'develop') {
         return 'Development'
     } else {
-        return 'FeatureBranch' // Або інше дефолтне значення для інших гілок
+        return 'FeatureBranch'
     }
 }
 
@@ -25,7 +23,7 @@ def determineAspNetCoreEnvironment(String branchName) {
     } else if (branchName == 'develop') {
         return 'Development'
     } else {
-        return 'Development' // Для feature-гілок зазвичай використовують Development налаштування
+        return 'Development'
     }
 }
 
@@ -37,33 +35,27 @@ pipeline {
         DOTNET_SDK_VERSION = '9.0'
         ERROR_NOTIFICATION_EMAIL = 'your-email@example.com' // ЗАМІНІТЬ
 
-        // Викликаємо функції тут. env.BRANCH_NAME має бути доступний на момент обчислення environment.
-        // Jenkins спочатку отримує Jenkinsfile, потім встановлює деякі базові змінні env (як BRANCH_NAME для multibranch),
-        // а потім обробляє блок environment.
         GIT_BRANCH_NAME              = "${env.BRANCH_NAME}"
         DEPLOY_ENVIRONMENT           = determineDeployEnvironment(env.BRANCH_NAME)
         ASPNETCORE_ENVIRONMENT_FOR_APP = determineAspNetCoreEnvironment(env.BRANCH_NAME)
         
-        IMAGE_TAG_LATEST           = "" // Будуть встановлені в script блоці
-        IMAGE_TAG_COMMIT           = "" // Будуть встановлені в script блоці
-        IMAGE_TAG_ENV_SPECIFIC     = "" // Будуть встановлені в script блоці
+        IMAGE_TAG_LATEST           = ""
+        IMAGE_TAG_COMMIT           = ""
+        IMAGE_TAG_ENV_SPECIFIC     = ""
     }
 
     stages {
         stage('Initialize and Display Environment') {
             steps {
                 script {
-                    // Перевіряємо, чи змінні середовища встановлені коректно
                     echo "Current Git branch (from env.BRANCH_NAME via env.GIT_BRANCH_NAME): ${env.GIT_BRANCH_NAME}"
                     if (env.GIT_BRANCH_NAME == null || env.GIT_BRANCH_NAME.isEmpty() || env.GIT_BRANCH_NAME == "null") {
-                        // Ця помилка має оброблятися всередині функцій determine*, але дублюємо перевірку тут для ясності
                         error "FATAL: Could not determine current Git branch. env.BRANCH_NAME was '${env.BRANCH_NAME}'"
                     }
                     
                     echo "Deployment Environment: ${env.DEPLOY_ENVIRONMENT}"
                     echo "ASPNETCORE_ENVIRONMENT for application: ${env.ASPNETCORE_ENVIRONMENT_FOR_APP}"
 
-                    // Визначаємо теги для Docker-образу
                     def shortCommit = sh(script: 'git rev-parse --short HEAD', returnStdout: true).trim()
                     env.IMAGE_TAG_LATEST = "${env.APP_IMAGE_NAME}:latest"
                     env.IMAGE_TAG_COMMIT = "${env.APP_IMAGE_NAME}:${shortCommit}"
@@ -79,9 +71,6 @@ pipeline {
                 }
             }
         }
-
-        // ... (решта етапів Build Application, Test Application, Build Docker Image, Push Docker Image, Deploy to Environment, Git Tagging for Production
-        //      залишаються такими ж, як у попередньому файлі, який я надавав, де вони вже були налаштовані)
 
         stage('Build Application (.NET)') {
             agent {
@@ -109,7 +98,7 @@ pipeline {
 
         stage('Build Docker Image') {
             steps {
-                script { // Додано script блок для безпечного доступу до env змінних у рядку
+                script {
                     echo "Building Docker image with tags: ${env.IMAGE_TAG_LATEST}, ${env.IMAGE_TAG_COMMIT}, ${env.IMAGE_TAG_ENV_SPECIFIC}"
                     sh "docker build -t \"${env.IMAGE_TAG_LATEST}\" -t \"${env.IMAGE_TAG_COMMIT}\" -t \"${env.IMAGE_TAG_ENV_SPECIFIC}\" ."
                 }
@@ -142,9 +131,9 @@ pipeline {
                         composeFiles += " -f ${overrideFileName}"
                         echo "Using override file: ${overrideFileName}"
                     } else {
-                        if (env.DEPLOY_ENVIRONMENT == 'Production' && overrideFileName != null) { // overrideFileName буде null, якщо DEPLOY_ENVIRONMENT null
+                        if (env.DEPLOY_ENVIRONMENT == 'Production' && overrideFileName != null) {
                             echo "WARNING: Production override file (${overrideFileName}) not found! Using default docker-compose.yml for Production."
-                        } else if (overrideFileName != null || (env.DEPLOY_ENVIRONMENT != null && env.DEPLOY_ENVIRONMENT != "null")) { // Додано умову, щоб уникнути логування, якщо DEPLOY_ENVIRONMENT null
+                        } else if (overrideFileName != null || (env.DEPLOY_ENVIRONMENT != null && env.DEPLOY_ENVIRONMENT != "null")) {
                             echo "No specific override file found for ${env.DEPLOY_ENVIRONMENT} (${overrideFileName ?: 'N/A'}), using default docker-compose.yml."
                         } else {
                             echo "DEPLOY_ENVIRONMENT is null or invalid, using default docker-compose.yml."
@@ -184,25 +173,30 @@ pipeline {
 
     post {
         always {
-            def finalBranchName = env.GIT_BRANCH_NAME ?: "unknown_branch (was null)"
-            def finalDeployEnv = env.DEPLOY_ENVIRONMENT ?: "unknown_environment (was null)"
-            echo "Pipeline finished for branch ${finalBranchName} and environment ${finalDeployEnv}."
-            cleanWs()
+            script { // <--- ДОДАНО SCRIPT БЛОК
+                def finalBranchName = env.GIT_BRANCH_NAME ?: "unknown_branch (was null)"
+                def finalDeployEnv = env.DEPLOY_ENVIRONMENT ?: "unknown_environment (was null)"
+                echo "Pipeline finished for branch ${finalBranchName} and environment ${finalDeployEnv}."
+            }
+            cleanWs() // cleanWs() є кроком і може бути тут
         }
         success {
-            // ...
+            // Тут можна додати кроки, якщо потрібно, наприклад, простий echo або script блок
+            echo 'Pipeline succeeded!'
         }
         failure {
-            def finalBranchName = env.GIT_BRANCH_NAME ?: "unknown_branch (was null)"
-            def finalDeployEnv = env.DEPLOY_ENVIRONMENT ?: "unknown_environment (was null)"
-            echo 'Pipeline failed!'
-            if (env.ERROR_NOTIFICATION_EMAIL && env.ERROR_NOTIFICATION_EMAIL != 'your-email@example.com') {
-                mail to: "${env.ERROR_NOTIFICATION_EMAIL}",
-                     subject: "FAILURE: Pipeline ${env.JOB_NAME} - Build #${env.BUILD_NUMBER} [${finalDeployEnv}]",
-                     body: """Pipeline ${env.JOB_NAME} - Build #${env.BUILD_NUMBER} for environment ${finalDeployEnv} on branch ${finalBranchName} failed.
+            script { // <--- ДОДАНО SCRIPT БЛОК
+                def finalBranchName = env.GIT_BRANCH_NAME ?: "unknown_branch (was null)"
+                def finalDeployEnv = env.DEPLOY_ENVIRONMENT ?: "unknown_environment (was null)"
+                echo 'Pipeline failed!'
+                if (env.ERROR_NOTIFICATION_EMAIL && env.ERROR_NOTIFICATION_EMAIL != 'your-email@example.com') {
+                    mail to: "${env.ERROR_NOTIFICATION_EMAIL}",
+                         subject: "FAILURE: Pipeline ${env.JOB_NAME} - Build #${env.BUILD_NUMBER} [${finalDeployEnv}]",
+                         body: """Pipeline ${env.JOB_NAME} - Build #${env.BUILD_NUMBER} for environment ${finalDeployEnv} on branch ${finalBranchName} failed.
 Check console output for more details: ${env.BUILD_URL}console"""
-            } else {
-                echo "Email notification skipped: ERROR_NOTIFICATION_EMAIL not configured properly."
+                } else {
+                    echo "Email notification skipped: ERROR_NOTIFICATION_EMAIL not configured properly."
+                }
             }
         }
     }
