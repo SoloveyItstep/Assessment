@@ -45,46 +45,50 @@ pipeline {
 
         stage('Docker Build') {
             steps {
-                sh 'docker build -t $DOCKER_IMAGE .'
-            }
-        }
-
-        stage('Start Dependencies') {
-            agent {
-                docker {
-                    image "${DOCKER_BASE_IMAGE}"
+                sh 'docker build -t <span class="math-inline">DOCKER\_IMAGE \.'
+\}
+\}
+stage\('Start Dependencies'\) \{
+agent \{
+docker \{
+image "</span>{DOCKER_BASE_IMAGE}" // ТУТ БУЛА ПРОБЛЕМА, ПОВИНЕН БУТИ 'image'
                     args '-v /var/run/docker.sock:/var/run/docker.sock' // Доступ до Docker Daemon
                 }
             }
             steps {
                 echo "DEBUG: Current working directory inside ${DOCKER_BASE_IMAGE} container:"
                 sh 'pwd'
-                echo "DEBUG: Listing contents inside ${DOCKER_BASE_IMAGE} container:"
-                sh 'ls -la'
-                echo "Installing Docker Compose v${DOCKER_COMPOSE_VERSION}..."
+                echo "DEBUG: Listing contents inside <span class="math-inline">\{DOCKER\_BASE\_IMAGE\} container\:"
+sh 'ls \-la'
+echo "Installing Docker Compose v</span>{DOCKER_COMPOSE_VERSION}..."
                 sh '''
                     # Встановлюємо curl та інші необхідні пакети
                     apk add --no-cache curl
 
                     # Завантажуємо бінарник Docker Compose v2.x.x
-                    curl -L "https://github.com/docker/compose/releases/download/v${DOCKER_COMPOSE_VERSION}/docker-compose-linux-$(uname -m)" \\
-                    -o /usr/local/bin/docker-compose
-
-                    # Робимо його виконуваним
-                    chmod +x /usr/local/bin/docker-compose
-
-                    # Перевіряємо версію (для відладки)
-                    docker-compose version
-
-                    echo "Starting Docker Compose services..."
-                    # Запускаємо сервіси за допомогою docker-compose (старий синтаксис, але бінарник v2)
-                    docker-compose up -d
-                '''
+                    curl -L "https://github.com/docker/compose/releases/download/v${DOCKER_COMPOSE_VERSION}/docker-compose-linux-<span class="math-inline">\(uname \-m\)" \\\\
+\-o /usr/local/bin/docker\-compose
+\# Робимо його виконуваним
+chmod \+x /usr/local/bin/docker\-compose
+\# Перевіряємо версію \(для відладки\)
+docker\-compose version
+echo "Starting Docker Compose services\.\.\."
+\# Запускаємо сервіси за допомогою docker\-compose \(старий синтаксис, але бінарник v2\)
+docker\-compose up \-d
+'''
+\}
+\}
+stage\('Run App Container'\) \{
+// Запускаємо додаток SessionMVC\. Цей етап не обов'язково повинен бути на тому ж агентові,
+// що й docker\-compose, оскільки він запускає вже зібраний образ\.
+// Можна залишити 'agent any' або використовувати інший, відповідний для запуску додатків\.
+// Якщо ви хочете, щоб він запускався на тому ж alpine/git, тоді\:
+agent \{
+docker \{
+image "</span>{DOCKER_BASE_IMAGE}" // ТУТ БУЛА ПРОБЛЕМА, ПОВИНЕН БУТИ 'image'
+                    args '-v /var/run/docker.sock:/var/run/docker.sock'
+                }
             }
-        }
-
-        stage('Run App Container') {
-            agent any
             steps {
                 echo "Running application container..."
                 sh "docker run -d -p 8081:5000 --name sessionmvc_container $DOCKER_IMAGE"
@@ -98,23 +102,6 @@ pipeline {
             sh 'docker stop sessionmvc_container || true'
             sh 'docker rm sessionmvc_container || true'
 
+            // Зупиняємо залежності в тому ж Docker Compose агентові
             agent {
                 docker {
-                    image "${DOCKER_BASE_IMAGE}"
-                    args '-v /var/run/docker.sock:/var/run/docker.sock'
-                }
-            }
-            steps {
-                echo "Stopping Docker Compose services..."
-                sh '''
-                    apk add --no-cache curl # Забезпечуємо наявність curl для завантаження docker-compose
-                    curl -L "https://github.com/docker/compose/releases/download/v${DOCKER_COMPOSE_VERSION}/docker-compose-linux-$(uname -m)" \\
-                    -o /usr/local/bin/docker-compose
-                    chmod +x /usr/local/bin/docker-compose
-
-                    docker-compose down --volumes
-                '''
-            }
-        }
-    }
-}
