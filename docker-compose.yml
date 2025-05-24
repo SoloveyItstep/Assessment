@@ -1,7 +1,7 @@
 services:
   db:
     image: mcr.microsoft.com/mssql/server:2022-latest
-    container_name: mssql
+    #container_name: mssql
     environment:
       SA_PASSWORD: "Your_password123" 
       ACCEPT_EULA: "Y"
@@ -20,7 +20,7 @@ services:
     
   rabbitmq:
     image: rabbitmq:3.12-management 
-    container_name: rabbitmq
+    #container_name: rabbitmq
     hostname: rabbitmq
     environment:
       RABBITMQ_DEFAULT_USER: "guest"
@@ -43,7 +43,7 @@ services:
   mongo:
     image: mongo:7.0 
     restart: always
-    container_name: mongo
+    #container_name: mongo
     ports:
       - "27017:27017"
     environment:
