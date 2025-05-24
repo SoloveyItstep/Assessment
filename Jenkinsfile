@@ -4,7 +4,7 @@ pipeline {
     environment {
         APP_IMAGE_NAME = 'sessionmvc'
         DOTNET_SDK_VERSION = '9.0'
-        ERROR_NOTIFICATION_EMAIL = 'your-email@example.com' // ЗАМІНІТЬ НА ВАШУ АДРЕСУ
+        ERROR_NOTIFICATION_EMAIL = 'solovey.itstep@gmail.com' // ЗАМІНІТЬ НА ВАШУ АДРЕСУ
 
         // Ці змінні будуть визначені на етапі Initialize Environment
         GIT_BRANCH_NAME = '' // Для зберігання імені поточної гілки
