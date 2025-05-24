@@ -33,15 +33,14 @@ pipeline {
     environment {
         APP_IMAGE_NAME = 'sessionmvc'
         DOTNET_SDK_VERSION = '9.0'
-        ERROR_NOTIFICATION_EMAIL = 'solovey.itstep@gmial.com' // ЗАМІНІТЬ
+        ERROR_NOTIFICATION_EMAIL = 'solovey.itstep@gmial.com' // Ваша пошта
 
+        // Визначаємо базові змінні середовища
         GIT_BRANCH_NAME              = "${env.BRANCH_NAME}"
         DEPLOY_ENVIRONMENT           = determineDeployEnvironment(env.BRANCH_NAME)
         ASPNETCORE_ENVIRONMENT_FOR_APP = determineAspNetCoreEnvironment(env.BRANCH_NAME)
         
-        IMAGE_TAG_LATEST           = ""
-        IMAGE_TAG_COMMIT           = ""
-        IMAGE_TAG_ENV_SPECIFIC     = ""
+        // Теги будуть повністю визначені та присвоєні env. в script блоці нижче
     }
 
     stages {
@@ -57,6 +56,7 @@ pipeline {
                     echo "ASPNETCORE_ENVIRONMENT for application: ${env.ASPNETCORE_ENVIRONMENT_FOR_APP}"
 
                     def shortCommit = sh(script: 'git rev-parse --short HEAD', returnStdout: true).trim()
+                    // Присвоюємо значення глобальним змінним env, щоб вони були доступні на наступних етапах
                     env.IMAGE_TAG_LATEST = "${env.APP_IMAGE_NAME}:latest"
                     env.IMAGE_TAG_COMMIT = "${env.APP_IMAGE_NAME}:${shortCommit}"
                     
@@ -67,7 +67,7 @@ pipeline {
                         echo "WARNING: DEPLOY_ENVIRONMENT was null or 'null' when creating IMAGE_TAG_ENV_SPECIFIC."
                     }
                     
-                    echo "Image tags will be: ${env.IMAGE_TAG_LATEST}, ${env.IMAGE_TAG_COMMIT}, ${env.IMAGE_TAG_ENV_SPECIFIC}"
+                    echo "Image tags set to: ${env.IMAGE_TAG_LATEST}, ${env.IMAGE_TAG_COMMIT}, ${env.IMAGE_TAG_ENV_SPECIFIC}"
                 }
             }
         }
@@ -100,7 +100,11 @@ pipeline {
             steps {
                 script {
                     echo "Building Docker image with tags: ${env.IMAGE_TAG_LATEST}, ${env.IMAGE_TAG_COMMIT}, ${env.IMAGE_TAG_ENV_SPECIFIC}"
-                    sh "docker build -t \"${env.IMAGE_TAG_LATEST}\" -t \"${env.IMAGE_TAG_COMMIT}\" -t \"${env.IMAGE_TAG_ENV_SPECIFIC}\" ."
+                    // Переконуємося, що змінні не null перед використанням
+                    def tagLatest = env.IMAGE_TAG_LATEST ?: "${env.APP_IMAGE_NAME}:latest-fallback"
+                    def tagCommit = env.IMAGE_TAG_COMMIT ?: "${env.APP_IMAGE_NAME}:commit-fallback"
+                    def tagEnvSpecific = env.IMAGE_TAG_ENV_SPECIFIC ?: "${env.APP_IMAGE_NAME}:env-fallback"
+                    sh "docker build -t \"${tagLatest}\" -t \"${tagCommit}\" -t \"${tagEnvSpecific}\" ."
                 }
             }
         }
@@ -124,21 +128,27 @@ pipeline {
                 script {
                     echo "Preparing to deploy to ${env.DEPLOY_ENVIRONMENT} environment using ASPNETCORE_ENVIRONMENT=${env.ASPNETCORE_ENVIRONMENT_FOR_APP}"
                     
-                    def composeFiles = "-f docker-compose.development.yml"
-                    //def overrideFileName = (env.DEPLOY_ENVIRONMENT != null && env.DEPLOY_ENVIRONMENT != "null") ? "docker-compose.${env.DEPLOY_ENVIRONMENT.toLowerCase()}.yml" : null
+                    // Базовий файл завжди docker-compose.yml
+                    def composeFiles = "-f docker-compose.yml" 
+                    // Визначаємо ім'я override-файлу на основі середовища
+                    def overrideFileName = (env.DEPLOY_ENVIRONMENT != null && env.DEPLOY_ENVIRONMENT != "null") ? "docker-compose.${env.DEPLOY_ENVIRONMENT.toLowerCase()}.yml" : null
                     
-                    //if (overrideFileName != null && fileExists(overrideFileName)) {
-                    //    composeFiles += " -f ${overrideFileName}"
-                    //    echo "Using override file: ${overrideFileName}"
-                    //} else {
-                        if (env.DEPLOY_ENVIRONMENT == 'Production' && overrideFileName != null) {
-                            echo "WARNING: Production override file (${overrideFileName}) not found! Using default docker-compose.yml for Production."
-                        } else if (overrideFileName != null || (env.DEPLOY_ENVIRONMENT != null && env.DEPLOY_ENVIRONMENT != "null")) {
-                            echo "No specific override file found for ${env.DEPLOY_ENVIRONMENT} (${overrideFileName ?: 'N/A'}), using default docker-compose.yml."
-                        } else {
-                            echo "DEPLOY_ENVIRONMENT is null or invalid, using default docker-compose.development.yml."
+                    if (overrideFileName != null && fileExists(overrideFileName)) {
+                        composeFiles += " -f ${overrideFileName}"
+                        echo "Using override file: ${overrideFileName}"
+                    } else {
+                        // Логіка для випадку, коли override-файл не знайдено
+                        if (env.DEPLOY_ENVIRONMENT == 'Production') {
+                             // Для Production override-файл бажаний, але якщо його немає, продовжимо з попередженням
+                            echo "WARNING: Production override file ('${overrideFileName ?: 'docker-compose.production.yml'}') not found! Using only default docker-compose.yml for Production."
+                        } else if (env.DEPLOY_ENVIRONMENT == 'Development') {
+                            echo "INFO: Development override file ('${overrideFileName ?: 'docker-compose.development.yml'}') not found. Using only default docker-compose.yml for Development."
+                        } else if (env.DEPLOY_ENVIRONMENT != "null" && env.DEPLOY_ENVIRONMENT != null) { // Для інших середовищ (напр. FeatureBranch)
+                            echo "INFO: No specific override file for ${env.DEPLOY_ENVIRONMENT} ('${overrideFileName}'). Using only default docker-compose.yml."
+                        } else { // Якщо DEPLOY_ENVIRONMENT не визначено (не повинно трапитися)
+                            echo "WARNING: DEPLOY_ENVIRONMENT is null or invalid, using only default docker-compose.yml."
                         }
-                    //}
+                    }
 
                     echo "Stopping and removing existing services (if any) using compose files: ${composeFiles}"
                     sh script: "docker-compose ${composeFiles} down --remove-orphans", returnStatus: true
@@ -173,29 +183,28 @@ pipeline {
 
     post {
         always {
-            script { // <--- ДОДАНО SCRIPT БЛОК
+            script { 
                 def finalBranchName = env.GIT_BRANCH_NAME ?: "unknown_branch (was null)"
                 def finalDeployEnv = env.DEPLOY_ENVIRONMENT ?: "unknown_environment (was null)"
                 echo "Pipeline finished for branch ${finalBranchName} and environment ${finalDeployEnv}."
             }
-            cleanWs() // cleanWs() є кроком і може бути тут
+            cleanWs() 
         }
         success {
-            // Тут можна додати кроки, якщо потрібно, наприклад, простий echo або script блок
             echo 'Pipeline succeeded!'
         }
         failure {
-            script { // <--- ДОДАНО SCRIPT БЛОК
+            script { 
                 def finalBranchName = env.GIT_BRANCH_NAME ?: "unknown_branch (was null)"
                 def finalDeployEnv = env.DEPLOY_ENVIRONMENT ?: "unknown_environment (was null)"
                 echo 'Pipeline failed!'
-                if (env.ERROR_NOTIFICATION_EMAIL && env.ERROR_NOTIFICATION_EMAIL != 'your-email@example.com') {
+                if (env.ERROR_NOTIFICATION_EMAIL && env.ERROR_NOTIFICATION_EMAIL != 'your-email@example.com') { // Перевіряємо, чи email змінено з дефолтного
                     mail to: "${env.ERROR_NOTIFICATION_EMAIL}",
                          subject: "FAILURE: Pipeline ${env.JOB_NAME} - Build #${env.BUILD_NUMBER} [${finalDeployEnv}]",
                          body: """Pipeline ${env.JOB_NAME} - Build #${env.BUILD_NUMBER} for environment ${finalDeployEnv} on branch ${finalBranchName} failed.
 Check console output for more details: ${env.BUILD_URL}console"""
                 } else {
-                    echo "Email notification skipped: ERROR_NOTIFICATION_EMAIL not configured properly."
+                    echo "Email notification skipped: ERROR_NOTIFICATION_EMAIL is default or not configured."
                 }
             }
         }
