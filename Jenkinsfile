@@ -3,10 +3,6 @@ pipeline {
 
     environment {
         DOCKER_IMAGE = 'sessionmvc-app:latest'
-        // Змінюємо образ Docker Compose на конкретну версію docker/cli
-        DOCKER_CLI_IMAGE = 'docker/cli:24.0.9' // Або іншу стабільну версію, яку ви можете знайти на Docker Hub.
-                                                // Важливо: переконайтеся, що цей образ має в собі плагін 'compose'.
-                                                // Більшість сучасних офіційних образів docker/cli його мають.
     }
 
     stages {
@@ -53,25 +49,23 @@ pipeline {
 
         stage('Start Dependencies') {
             steps {
-                echo "DEBUG: Current working directory before docker-compose up:"
-                sh 'pwd'
-                echo "DEBUG: Listing contents of current directory:"
-                sh 'ls -la'
-
-                // Використовуємо docker/cli:24.0.9 і новий синтаксис 'compose'
-                sh '''
-                    docker run --rm \
-                        -v /var/run/docker.sock:/var/run/docker.sock \
-                        -v $WORKSPACE:$WORKSPACE \
-                        -w $WORKSPACE \
-                        ${DOCKER_CLI_IMAGE} \
-                        compose up -d
-                '''
+                echo "Starting Docker Compose dependencies using plugin..."
+                // Використовуємо крок плагіна dockerCompose для 'up'
+                // Зверніть увагу: dockerCompose.up() або dc.up() можуть бути доступні залежно від версії плагіна.
+                // Перевірте Snippet Generator в Jenkins для точного синтаксису.
+                dockerCompose.up(
+                    file: 'docker-compose.yml', // Шлях до вашого docker-compose.yml
+                    detached: true,             // Еквівалент -d
+                    removeOrphans: true         // Гарна практика для очищення
+                )
             }
         }
 
         stage('Run App Container') {
             steps {
+                echo "Running application container..."
+                // Цей етап залишаємо, оскільки це запуск вашого конкретного додатка,
+                // який ви збирали в Docker Build stage.
                 sh "docker run -d -p 8081:5000 --name sessionmvc_container $DOCKER_IMAGE"
             }
         }
@@ -79,23 +73,15 @@ pipeline {
 
     post {
         always {
+            echo "Stopping and removing containers..."
             sh 'docker stop sessionmvc_container || true'
             sh 'docker rm sessionmvc_container || true'
 
-            echo "DEBUG: Current working directory before docker-compose down (post-action):"
-            sh 'pwd'
-            echo "DEBUG: Listing contents of current directory (post-action):"
-            sh 'ls -la'
-
-            // Використовуємо docker/cli:24.0.9 і новий синтаксис 'compose'
-            sh '''
-                docker run --rm \
-                    -v /var/run/docker.sock:/var/run/docker.sock \
-                    -v $WORKSPACE:$WORKSPACE \
-                    -w $WORKSPACE \
-                    ${DOCKER_CLI_IMAGE} \
-                    compose down
-            '''
+            // Використовуємо крок плагіна dockerCompose для 'down'
+            dockerCompose.down(
+                file: 'docker-compose.yml',
+                removeVolumes: true // Рекомендується для повного очищення
+            )
         }
     }
 }
