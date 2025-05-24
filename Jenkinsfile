@@ -18,7 +18,7 @@ pipeline {
             agent {
                 docker {
                     image 'mcr.microsoft.com/dotnet/sdk:9.0'
-                    args '-v /var/run/docker.sock:/var/run/docker.sock' // Для доступу до Docker Daemon з контейнера SDK
+                    args '-v /var/run/docker.sock:/var/run/docker.sock'
                 }
             }
             steps {
@@ -30,9 +30,9 @@ pipeline {
                       --logger "trx;LogFileName=testresults.trx" \\
                       --results-directory TestResults
                 '''
-                junit 'TestResults/*.xml' // Перемістив junit сюди, щоб він виконувався після тестів
-                sh 'mkdir -p TestResults' // Переконайтеся, що папка створюється перед використанням
-                sh 'rm -f TestResults/testresults.xml' // Очищаємо перед використанням trx2junit
+                junit 'TestResults/*.xml'
+                sh 'mkdir -p TestResults'
+                sh 'rm -f TestResults/testresults.xml'
                 sh '''
                     export PATH="$PATH:$HOME/.dotnet/tools"
                     if ! command -v trx2junit >/dev/null 2>&1; then
@@ -45,18 +45,15 @@ pipeline {
 
         stage('Docker Build') {
             steps {
-                // Збираємо образ вашого додатка. Виконується на Jenkins-агенті (який має доступ до Docker).
-                sh 'docker build -t $DOCKER_IMAGE .' // Перевірте цей рядок!
+                sh 'docker build -t $DOCKER_IMAGE .'
             }
         }
 
         stage('Start Dependencies') {
-            // Цей етап запускає docker-compose. Ми використовуємо спеціальний Docker-образ,
-            // який завантажить та виконає docker-compose.
             agent {
                 docker {
                     image "${DOCKER_BASE_IMAGE}"
-                    args '-v /var/run/docker.sock:/var/run/docker.sock' // Надаємо доступ до Docker Daemon хоста
+                    args '-v /var/run/docker.sock:/var/run/docker.sock'
                 }
             }
             steps {
@@ -70,7 +67,6 @@ pipeline {
                     apk add --no-cache curl
 
                     # Завантажуємо бінарник Docker Compose v2.x.x
-                    # $(uname -s)-$(uname -m) автоматично визначить операційну систему та архітектуру (наприклад, linux-x86_64)
                     curl -L "https://github.com/docker/compose/releases/download/v${DOCKER_COMPOSE_VERSION}/docker-compose-linux-$(uname -m)" \\
                     -o /usr/local/bin/docker-compose
 
@@ -88,19 +84,15 @@ pipeline {
         }
 
         stage('Run App Container') {
-            // Запускаємо контейнер вашого додатка.
-            // Ми можемо використовувати той самий агент, що й для docker-compose, або будь-який інший.
             agent {
                 docker {
-                    image "${DOCKER_BASE_IMAGE}" // Використовуємо той же образ для стабільності
+                    image "${DOCKER_BASE_IMAGE}"
                     args '-v /var/run/docker.sock:/var/run/docker.sock'
                 }
             }
             steps {
                 echo "Running application container..."
-                // Запускаємо контейнер sessionmvc, мапимо порт 8081 хоста на 5000 контейнера,
-                // і даємо йому ім'я sessionmvc_container.
-                sh "docker run -d -p 8081:5000 --name sessionmvc_container $DOCKER_IMAGE" // Перевірте цей рядок!
+                sh "docker run -d -p 8081:5000 --name sessionmvc_container $DOCKER_IMAGE"
             }
         }
     }
@@ -108,12 +100,9 @@ pipeline {
     post {
         always {
             echo "Stopping and removing containers in post-build action..."
-            // Зупиняємо та видаляємо контейнер додатка. '|| true' запобігає падінню пайплайну,
-            // якщо контейнер вже не існує (наприклад, попередній запуск не вдався повністю).
             sh 'docker stop sessionmvc_container || true'
             sh 'docker rm sessionmvc_container || true'
 
-            // Зупиняємо та видаляємо сервіси, запущені за допомогою docker-compose.
             agent {
                 docker {
                     image "${DOCKER_BASE_IMAGE}"
@@ -122,9 +111,9 @@ pipeline {
             }
             steps {
                 echo "Stopping Docker Compose services..."
-                # Встановлюємо curl та docker-compose ще раз на випадок, якщо це окремий виклик
-                # або агент перепідключився. Це забезпечує надійність.
                 sh '''
+                    # Встановлюємо curl та docker-compose ще раз на випадок, якщо це окремий виклик
+                    # або агент перепідключився. Це забезпечує надійність.
                     apk add --no-cache curl
                     curl -L "https://github.com/docker/compose/releases/download/v${DOCKER_COMPOSE_VERSION}/docker-compose-linux-$(uname -m)" \\
                     -o /usr/local/bin/docker-compose
