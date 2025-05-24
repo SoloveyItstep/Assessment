@@ -25,18 +25,29 @@ pipeline {
             }
         }
 
-    stage('Build Application (.NET)') {
+        stage('Build Application (.NET)') {
             agent {
                 docker {
                     image "mcr.microsoft.com/dotnet/sdk:${env.DOTNET_SDK_VERSION}"
-                    // args '-u root' // Розкоментуйте, якщо виникають проблеми з правами доступу всередині контейнера
                 }
             }
             steps {
                 echo "Current directory listing inside the container:"
-                sh 'ls -la' // <--- ДОДАЙТЕ ЦЕЙ РЯДОК
-                echo "Building the ASP.NET Core application (Solution: SessionMvc.sln)..."
-                sh 'dotnet build SessionMvc.sln --configuration Release'
+                sh 'ls -la'
+                echo "Building the ASP.NET Core application (Solution: Assessment.sln)..." // Змінено тут
+                sh 'dotnet build Assessment.sln --configuration Release'                   // І тут
+            }
+        }
+
+        stage('Test Application (.NET)') {
+            agent {
+                docker {
+                    image "mcr.microsoft.com/dotnet/sdk:${env.DOTNET_SDK_VERSION}"
+                }
+            }
+            steps {
+                echo "Running .NET tests (Solution: Assessment.sln)..." // Змінено тут
+                sh 'dotnet test Assessment.sln --configuration Release --no-build' // І тут
             }
         }
 
