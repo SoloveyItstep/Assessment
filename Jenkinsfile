@@ -49,25 +49,32 @@ pipeline {
 
         stage('Start Dependencies') {
             steps {
-                echo "Starting Docker Compose dependencies using plugin..."
-                // Використовуємо синтаксис плагіна для Declarative Pipeline
-                // Зверніть увагу: назва кроку, як правило, просто 'dockerCompose' або 'dockerComposeUp'
-                // або 'dockerComposeBuild' залежно від того, як його зареєстровано.
-                // Я використовую загальну назву 'dockerCompose' тут.
-                // Якщо не спрацює, перевірте Snippet Generator.
-                dockerCompose(
-                    // Обов'язково вказуємо команду. Для 'up' це зазвичай неявне, але краще вказати.
-                    // Це може бути 'up', 'build', 'pull', 'down'
-                    command: 'up',
-                    // Шлях до файлу docker-compose.yml.
-                    // Якщо ваш файл у корені, можна залишити порожнім, або вказати 'docker-compose.yml'.
-                    // Зазвичай параметр називається 'file' або 'yamlFile'
-                    file: 'docker-compose.yml',
-                    // Додаткові опції командного рядка
-                    // Ви можете додати --detach або інші опції тут.
-                    // Плагін може мати вбудовані параметри, такі як 'detached'
-                    options: '--detach'
-                )
+                echo "Starting Docker Compose dependencies using plugin (via script block)..."
+                script {
+                    // Виклик плагіна Docker Compose Build Step
+                    // Перевірте Snippet Generator для точного синтаксису,
+                    // але це має бути щось на кшталт:
+                    // step([$class: 'DockerComposeBuilder',
+                    //       dockerComposeFile: 'docker-compose.yml',
+                    //       executeCommandInsideContainer: [],
+                    //       startAllServices: true, // Це для 'up -d'
+                    //       stopAllServices: false // Не зупиняємо тут
+                    // ])
+
+                    // Краще використовувати параметри, які імітують команду `up -d`
+                    // Це може бути або 'StartAllServices', або 'ExecuteCommandInsideContainer'
+                    // Давайте використаємо ExecuteCommandInsideContainer, щоб бути гнучкими
+                    step([$class: 'DockerComposeBuilder',
+                          // Обираємо команду для виконання
+                          dockerComposeCommand: [
+                              $class: 'ExecuteCommandInsideContainer', // Це виконує довільну команду
+                              command: 'up -d', // Саме тут передаємо команду Docker Compose
+                              // service: '', // Якщо ви не вказуєте конкретний сервіс, то команду виконують для всіх.
+                              // workDir: '' // Робочий каталог, якщо docker-compose.yml не в корені.
+                          ],
+                          dockerComposeFile: 'docker-compose.yml' // Шлях до файлу docker-compose.yml
+                    ])
+                }
             }
         }
 
@@ -85,13 +92,16 @@ pipeline {
             sh 'docker stop sessionmvc_container || true'
             sh 'docker rm sessionmvc_container || true'
 
-            // Використовуємо синтаксис плагіна для Declarative Pipeline для 'down'
-            dockerCompose(
-                command: 'down',
-                file: 'docker-compose.yml',
-                // Опції для 'down', наприклад, --volumes
-                options: '--volumes'
-            )
+            script {
+                // Виклик плагіна Docker Compose Build Step для 'down'
+                step([$class: 'DockerComposeBuilder',
+                      dockerComposeCommand: [
+                          $class: 'ExecuteCommandInsideContainer',
+                          command: 'down --volumes' // Команда down з опцією видалення томів
+                      ],
+                      dockerComposeFile: 'docker-compose.yml'
+                ])
+            }
         }
     }
 }
