@@ -3,8 +3,6 @@ pipeline {
 
     environment {
         DOCKER_IMAGE = 'sessionmvc-app:latest'
-        // WORKSPACE змінна автоматично доступна в Jenkins, її не потрібно перевизначати.
-        // Але її використання є правильним.
     }
 
     stages {
@@ -18,8 +16,6 @@ pipeline {
             agent {
                 docker {
                     image 'mcr.microsoft.com/dotnet/sdk:9.0'
-                    // Важливо: для доступу до Docker daemon зсередини Docker контейнера,
-                    // потрібно монтувати сокет. Це вже зроблено правильно.
                     args '-v /var/run/docker.sock:/var/run/docker.sock'
                 }
             }
@@ -47,15 +43,17 @@ pipeline {
 
         stage('Docker Build') {
             steps {
-                // Збираємо ваш образ. Важливо, щоб Dockerfile був у корені.
                 sh 'docker build -t $DOCKER_IMAGE .'
             }
         }
 
         stage('Start Dependencies') {
             steps {
-                // Піднімаємо Mongo, Redis, RabbitMQ, ваш сервіс за допомогою docker-compose
-                // Використання $WORKSPACE тут правильне.
+                echo "DEBUG: Current working directory before docker-compose:"
+                sh 'pwd'
+                echo "DEBUG: Listing contents of current directory:"
+                sh 'ls -la' // Це покаже вміст $WORKSPACE
+
                 sh '''
                     docker run --rm \
                         -v /var/run/docker.sock:/var/run/docker.sock \
@@ -69,23 +67,24 @@ pipeline {
 
         stage('Run App Container') {
             steps {
-                // Запускаємо вашу апку на 8081
                 sh "docker run -d -p 8081:5000 --name sessionmvc_container $DOCKER_IMAGE"
-                // Додайте затримку або Health Check, щоб переконатися, що контейнер запущено
-                // та він доступний, перш ніж переходити до наступних етапів (якщо такі будуть)
-                // наприклад:
-                // sh 'sleep 10' // Просто затримка
-                // sh 'docker ps -f name=sessionmvc_container' // Перевірка, що контейнер запущено
+                // Можливо, тут потрібна невелика затримка, якщо додаток швидко запускається,
+                // але Health Checks в docker-compose вже забезпечують очікування баз.
+                // sh 'sleep 5'
             }
         }
     }
 
     post {
         always {
-            // Завжди зупиняємо і видаляємо контейнер апки
             sh 'docker stop sessionmvc_container || true'
             sh 'docker rm sessionmvc_container || true'
-            // І згортаємо залежності
+
+            echo "DEBUG: Current working directory before docker-compose down (post-action):"
+            sh 'pwd'
+            echo "DEBUG: Listing contents of current directory (post-action):"
+            sh 'ls -la' // Це також покаже вміст $WORKSPACE в post-дії
+
             sh '''
                 docker run --rm \
                     -v /var/run/docker.sock:/var/run/docker.sock \
