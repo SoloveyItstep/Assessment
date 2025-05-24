@@ -124,7 +124,7 @@ pipeline {
                 script {
                     echo "Preparing to deploy to ${env.DEPLOY_ENVIRONMENT} environment using ASPNETCORE_ENVIRONMENT=${env.ASPNETCORE_ENVIRONMENT_FOR_APP}"
                     
-                    def composeFiles = "-f docker-compose.yml"
+                    def composeFiles = "-f docker-compose.development.yml"
                     def overrideFileName = (env.DEPLOY_ENVIRONMENT != null && env.DEPLOY_ENVIRONMENT != "null") ? "docker-compose.${env.DEPLOY_ENVIRONMENT.toLowerCase()}.yml" : null
                     
                     if (overrideFileName != null && fileExists(overrideFileName)) {
@@ -136,7 +136,7 @@ pipeline {
                         } else if (overrideFileName != null || (env.DEPLOY_ENVIRONMENT != null && env.DEPLOY_ENVIRONMENT != "null")) {
                             echo "No specific override file found for ${env.DEPLOY_ENVIRONMENT} (${overrideFileName ?: 'N/A'}), using default docker-compose.yml."
                         } else {
-                            echo "DEPLOY_ENVIRONMENT is null or invalid, using default docker-compose.yml."
+                            echo "DEPLOY_ENVIRONMENT is null or invalid, using default docker-compose.development.yml."
                         }
                     }
 
