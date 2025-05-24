@@ -1,101 +1,91 @@
 pipeline {
-    agent any // Глобальний агент. Можна змінити на 'none' і визначати агент для кожного етапу
+    agent any // Глобальний агент. Jenkins виконуватиме кроки на доступному вузлі.
 
     environment {
-        // Визначаємо імена образів та теги тут, щоб їх було легко змінити
-        // Це базове ім'я образу для вашого додатку
-        APP_IMAGE_NAME = 'sessionmvc'
-        // Якщо ви плануєте використовувати Docker Hub або інший реєстр, вкажіть повне ім'я:
-        // DOCKER_REGISTRY_IMAGE_NAME = "yourdockerhubusername/${APP_IMAGE_NAME}"
-        // Якщо реєстр не використовується, залиште просто APP_IMAGE_NAME
-        // Для прикладу, якщо не використовуємо реєстр:
-        FINAL_IMAGE_NAME_BASE = APP_IMAGE_NAME
+        // Базове ім'я образу для вашого додатку
+        APP_IMAGE_NAME = 'sessionmvc' // Це ім'я використовується у вашому docker-compose.yml
+        // Версія .NET SDK, яку ви використовуєте
+        DOTNET_SDK_VERSION = '9.0' // Ви вказали 9.0
     }
 
     stages {
         stage('Checkout') {
             steps {
+                // Завантажуємо код з репозиторію
                 git url: 'https://github.com/SoloveyItstep/Assessment.git', branch: 'master'
                 script {
-                    // Визначаємо теги після завантаження коду
+                    // Визначаємо теги для Docker-образу
                     def shortCommit = sh(script: 'git rev-parse --short HEAD', returnStdout: true).trim()
-                    env.IMAGE_TAG_LATEST = "${env.FINAL_IMAGE_NAME_BASE}:latest"
-                    env.IMAGE_TAG_COMMIT = "${env.FINAL_IMAGE_NAME_BASE}:${shortCommit}"
+                    env.IMAGE_TAG_LATEST = "${env.APP_IMAGE_NAME}:latest"
+                    env.IMAGE_TAG_COMMIT = "${env.APP_IMAGE_NAME}:${shortCommit}"
+                    
+                    echo "Latest image tag: ${env.IMAGE_TAG_LATEST}"
+                    echo "Commit image tag: ${env.IMAGE_TAG_COMMIT}"
                 }
             }
         }
 
-        // --- Етапи для ASP.NET Core проєкту ---
         stage('Build Application (.NET)') {
             agent {
-                // Використовуємо Docker-контейнер з .NET SDK 9.0 для збірки
+                // Використовуємо Docker-контейнер з .NET SDK для збірки
                 docker {
-                    image 'mcr.microsoft.com/dotnet/sdk:9.0'
-                    // args '-u root' // Якщо є проблеми з правами доступу
+                    image "mcr.microsoft.com/dotnet/sdk:${env.DOTNET_SDK_VERSION}"
+                    // args '-u root' // Розкоментуйте, якщо виникають проблеми з правами доступу всередині контейнера
                 }
             }
             steps {
-                echo 'Building the ASP.NET Core application...'
-                // Потрібно знати шлях до .sln або .csproj файлу, якщо він не в корені
-                // Якщо .sln або .csproj в корені:
-                sh 'dotnet build --configuration Release'
-                // Якщо в підпапці, наприклад, src/YourProject.sln:
-                // sh 'dotnet build src/YourProject.sln --configuration Release'
+                echo "Building the ASP.NET Core application (Solution: SessionMvc.sln)..."
+                // Оскільки SessionMvc.sln знаходиться в корені, можна просто виконати:
+                sh 'dotnet build SessionMvc.sln --configuration Release'
             }
         }
 
         stage('Test Application (.NET)') {
             agent {
                 docker {
-                    image 'mcr.microsoft.com/dotnet/sdk:9.0' // Та сама версія SDK
+                    image "mcr.microsoft.com/dotnet/sdk:${env.DOTNET_SDK_VERSION}"
                 }
             }
             steps {
-                echo 'Running .NET tests...'
-                // Потрібно знати шлях до тестового проєкту або .sln
-                // Якщо тести визначаються у .sln:
-                sh 'dotnet test --configuration Release --no-build'
-                // Якщо для конкретного тестового проєкту:
-                // sh 'dotnet test path/to/your/testproject.csproj --configuration Release --no-build'
+                echo "Running .NET tests (Solution: SessionMvc.sln)..."
+                // Запускаємо тести для всього рішення, не збираючи проєкт заново
+                sh 'dotnet test SessionMvc.sln --configuration Release --no-build'
             }
         }
-        // --- Кінець етапів для ASP.NET Core проєкту ---
 
         stage('Build Docker Image') {
+            // Цей етап виконується на агенті Jenkins, який має доступ до Docker CLI
+            // та Docker-демону (якщо Jenkins в Docker, сокет має бути прокинутий)
             steps {
                 echo "Building Docker image ${env.IMAGE_TAG_LATEST} and ${env.IMAGE_TAG_COMMIT}..."
-                // Dockerfile знаходиться в корені проєкту (context: .)
-                // Згідно з docker-compose.yml, образ має називатися 'sessionmvc'
+                // Dockerfile знаходиться в корені проєкту (context: .), тому просто '.'
+                // Тегуємо образ одразу двома тегами: 'latest' та з хешем коміту
                 sh "docker build -t ${env.IMAGE_TAG_LATEST} -t ${env.IMAGE_TAG_COMMIT} ."
             }
         }
 
-        stage('Push Docker Image (Optional)') {
-            // Розкоментуйте та налаштуйте, якщо будете використовувати Docker Registry
-            /*
-            when {
-                branch 'master' // Наприклад, пушити тільки для гілки master
-            }
+        stage('Push Docker Image (Skipped)') {
+            // Цей етап пропускається, оскільки ви не використовуєте Docker Hub для завантаження
             steps {
-                echo "Pushing Docker images..."
-                // Потрібно налаштувати credentials в Jenkins (наприклад, 'dockerhub-credentials')
-                withCredentials([usernamePassword(credentialsId: 'dockerhub-credentials', usernameVariable: 'DOCKER_USER', passwordVariable: 'DOCKER_PASS')]) {
-                   sh "echo \"${DOCKER_PASS}\" | docker login -u \"${DOCKER_USER}\" --password-stdin your.registry.com" // Замініть your.registry.com, якщо не Docker Hub
-                   sh "docker push ${env.IMAGE_TAG_LATEST}" // Або env.DOCKER_REGISTRY_IMAGE_NAME
-                   sh "docker push ${env.IMAGE_TAG_COMMIT}" // Або env.DOCKER_REGISTRY_IMAGE_NAME
-                }
-            }
-            */
-            steps {
-                echo "Skipping Docker Push. Configure if needed."
+                echo "Skipping Docker Image Push as per configuration (not using Docker Hub for this app)."
             }
         }
 
         stage('Deploy with Docker Compose') {
+            // Цей етап також потребує доступу до Docker CLI та docker-compose
             steps {
                 echo 'Deploying application using Docker Compose...'
-                // docker-compose.yml знаходиться в корені
+                // docker-compose.yml знаходиться в корені проєкту.
+                // Команда `docker-compose up -d --build <service_name>` перебудує образ для <service_name>
+                // (використовуючи локально зібраний образ, якщо тег співпадає з тим, що вказано в image: у docker-compose,
+                // або якщо docker-compose бачить, що build context змінився і його Dockerfile)
+                // та перезапустить його.
+                // У вашому docker-compose.yml для sessionmvc вказано `image: sessionmvc` та `build: .`,
+                // тому `docker-compose up -d --build sessionmvc` повинен використовувати образ,
+                // який ми зібрали на попередньому етапі і затегували як 'sessionmvc:latest'.
                 sh "docker-compose up -d --build sessionmvc"
+
+                echo "To check logs after deploy, run: docker-compose logs --tail=50 sessionmvc"
             }
         }
     }
@@ -103,6 +93,7 @@ pipeline {
     post {
         always {
             echo 'Pipeline finished.'
+            // Очищення робочої області Jenkins (видаляє файли з checkout)
             cleanWs()
         }
         success {
@@ -110,6 +101,7 @@ pipeline {
         }
         failure {
             echo 'Pipeline failed!'
+            // Тут можна додати сповіщення про помилку
         }
     }
 }
