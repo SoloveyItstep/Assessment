@@ -1,122 +1,66 @@
 pipeline {
-    agent none 
-    stages {
-        stage('.NET Build and Test') {
-            agent {
-                docker { 
-                    image 'mcr.microsoft.com/dotnet/sdk:9.0'
-                }
-            }
-            stages {
-                stage('Checkout') {
-                    steps {
-                        echo 'Cloning the repository...'
-                        checkout scm
-                    }
-                }
-                stage('Restore Dependencies') {
-                    steps {
-                        echo 'Restoring .NET dependencies...'
-                        sh 'dotnet restore Assessment.sln'
-                    }
-                }
-                stage('Build') {
-                    steps {
-                        echo 'Building the project...'
-                        sh 'dotnet build Assessment.sln --configuration Release --no-restore'
-                    }
-                }
-                stage('Test') {
-                    steps {
-                        echo 'Running tests...'
-                        sh 'dotnet test Assessment.sln --no-build --configuration Release --logger "trx;LogFileName=testresults.trx" --results-directory ./TestResults'
-                    }
-                }
-            }
+  agent any
+
+  environment {
+    DOCKER_IMAGE = 'sessionmvc-app:latest'
+  }
+
+  stages {
+    stage('Dotnet Tasks') {
+      agent {
+        docker {
+          image 'mcr.microsoft.com/dotnet/sdk:9.0'
+          args '-v /var/run/docker.sock:/var/run/docker.sock'
         }
+      }
+      steps {
+        // Клонування репозиторію
+        git url: 'https://github.com/SoloveyItstep/Assessment.git', branch: 'master'
 
-        stage('Build App Docker Image') {
-            agent { label 'master' } 
-            steps {
-                echo 'DEBUG: Current PATH on agent for Docker Build:'
-                sh 'echo $PATH'
-                echo 'DEBUG: Attempting to find docker command:'
-                sh 'which docker' 
-                sh 'docker --version' 
-                
-                echo 'Building Docker image for SessionMVC...'
-                script {
-                    try {
-                        echo "Current directory: ${sh(script: 'pwd', returnStdout: true).trim()}"
-                        echo "Workspace contents:"
-                        sh 'ls -la' 
-                        
-                        // Dockerfile тепер у корені
-                        def appImage = docker.build("sessionmvc-app:${env.BUILD_NUMBER}", "-f Dockerfile .")
-                        echo "Successfully built Docker image: ${appImage.id}"
-                    } catch (e) {
-                        echo "Error during docker.build: ${e.toString()}"
-                        error "Failed to build Docker image: ${e.getMessage()}"
-                    }
-                }
-            }
-        }
+        // Відновлення залежностей
+        sh 'dotnet restore Assessment.sln'
 
-        stage('Run App Docker Image (Test)') {
-            agent { label 'master' } 
-            steps {
-                script {
-                    echo 'Running the SessionMVC Docker image with environment variables...'
-                    def sqlConnectionString = "Server=db;Database=Assessment;User=sa;Password=Your_password123;Encrypt=False;TrustServerCertificate=True"
-                    // Переконайтеся, що 'Assessment' - правильна назва БД для Mongo у ваших appsettings.json або тут
-                    def mongoConnectionStringVal = "mongodb://mongo:27017/Assessment?directConnection=true" 
+        // Побудова проєкту
+        sh 'dotnet build Assessment.sln --configuration Release --no-restore'
 
-                    sh "docker rm -f sessionmvc-run-${env.BUILD_NUMBER} || true"
+        // Запуск тестів і конвертація результатів
+        sh '''
+          dotnet test Assessment.sln --no-build --configuration Release --logger "trx;LogFileName=testresults.trx" --results-directory ./TestResults
+          export PATH="$PATH:$HOME/.dotnet/tools"
+          if ! command -v trx2junit >/dev/null 2>&1; then
+            dotnet tool install --global trx2junit
+          fi
+          trx2junit ./TestResults/testresults.trx
+        '''
 
-                    // ВИПРАВЛЕНО: Прибрано --network devnetwork для цього ізольованого тестового запуску.
-                    // Додаток, ймовірно, не зможе підключитися до БД на цьому етапі (якщо БД в іншій мережі),
-                    // але сам контейнер має запуститися без помилки "network not found".
-                    sh """
-                        docker run -d \
-                            -p 8081:5000 \
-                            --name sessionmvc-run-${env.BUILD_NUMBER} \
-                            -e ASPNETCORE_ENVIRONMENT=Development \
-                            -e "ConnectionStrings__AssessmentDbConnectionString=${sqlConnectionString}" \
-                            -e "MongoConnectionString=${mongoConnectionStringVal}" \
-                            sessionmvc-app:${env.BUILD_NUMBER}
-                    """
-                    echo "SessionMVC app starting on http://localhost:8081"
-                    echo "Waiting for 30 seconds..."
-                    sh "sleep 30" 
-
-                    echo "Checking container status for sessionmvc-run-${env.BUILD_NUMBER}:"
-                    sh "docker ps -a --filter name=sessionmvc-run-${env.BUILD_NUMBER}"
-                    echo "Fetching logs from sessionmvc-run-${env.BUILD_NUMBER}:"
-                    // Збільшено кількість рядків логу для кращої діагностики
-                    sh "docker logs --tail 500 sessionmvc-run-${env.BUILD_NUMBER} || echo 'Could not fetch logs or container exited.'"
-
-                    echo "Stopping and removing the SessionMVC container..."
-                    sh "docker stop sessionmvc-run-${env.BUILD_NUMBER} || echo 'Container already stopped or not found'"
-                    sh "docker rm sessionmvc-run-${env.BUILD_NUMBER} || echo 'Container already removed or not found'"
-                    echo "SessionMVC container stopped and removed."
-                }
-            }
-        }
+        // Публікація звіту
+        junit 'TestResults/testresults.xml'
+      }
     }
-    post {
-        always {
-            agent { label 'master' } 
-            steps { 
-                echo 'Pipeline finished. Processing post-build actions...'
-                junit allowEmptyResults: true, testResults: 'TestResults/testresults.trx'
-                recordIssues tool: msBuild(), ignoreQualityGate: true, failOnError: false
-            }
-        }
-        success {
-            echo 'Pipeline succeeded!'
-        }
-        failure {
-            echo 'Pipeline failed!'
-        }
+
+    stage('Docker Build') {
+      steps {
+        sh 'docker build -t $DOCKER_IMAGE .'
+      }
     }
+
+    stage('Start Dependencies') {
+      steps {
+        sh 'docker-compose up -d'
+      }
+    }
+
+    stage('Run App Container') {
+      steps {
+        sh 'docker run -d -p 8081:5000 --name sessionmvc_container $DOCKER_IMAGE'
+      }
+    }
+  }
+
+  post {
+    always {
+      sh 'docker stop sessionmvc_container || true'
+      sh 'docker rm sessionmvc_container || true'
+    }
+  }
 }
