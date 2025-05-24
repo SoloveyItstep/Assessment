@@ -74,9 +74,19 @@ pipeline {
                 }
             }
             steps {
+                echo 'Stopping and removing existing services defined in docker-compose.yml (if any)...'
+                // Додаємо --remove-orphans для видалення контейнерів, які більше не визначені в compose-файлі,
+                // та ignoreExitCode: true, оскільки команда може повернути помилку, якщо сервісів немає,
+                // але ми хочемо продовжити виконання.
+                sh script: 'docker-compose down --remove-orphans', returnStatus: true // returnStatus замість ignoreExitCode для більш точного контролю якщо потрібно
+                
                 echo 'Deploying application using Docker Compose...'
                 sh 'docker-compose --version'
-                sh "docker-compose up -d --build sessionmvc"
+                // Запускаємо всі сервіси з docker-compose.yml, перебудовуючи sessionmvc
+                sh "docker-compose up -d --build sessionmvc" 
+                // Або, якщо ви хочете перебудувати всі сервіси, що мають секцію build:
+                // sh "docker-compose up -d --build"
+
                 echo "To check logs after deploy, run: docker-compose logs --tail=50 sessionmvc"
             }
         }
@@ -85,18 +95,20 @@ pipeline {
     post {
         always {
             echo 'Pipeline finished.'
+            // Можливо, ви захочете також тут викликати 'docker-compose down',
+            // якщо хочете, щоб сервіси працювали тільки під час пайплайну і зупинялися після.
+            // Але якщо вони мають працювати постійно, то тут це не потрібно.
+            // sh script: 'docker-compose down --remove-orphans', returnStatus: true
             cleanWs()
         }
         success {
             echo 'Pipeline succeeded!'
-            // Приклад сповіщення про успіх (якщо потрібно)
             // mail to: "${env.ERROR_NOTIFICATION_EMAIL}",
             //      subject: "SUCCESS: Pipeline ${env.JOB_NAME} - Build #${env.BUILD_NUMBER}",
             //      body: "Pipeline ${env.JOB_NAME} - Build #${env.BUILD_NUMBER} completed successfully. URL: ${env.BUILD_URL}"
         }
         failure {
             echo 'Pipeline failed!'
-            // Сповіщення про помилку електронною поштою
             mail to: "${env.ERROR_NOTIFICATION_EMAIL}",
                  subject: "FAILURE: Pipeline ${env.JOB_NAME} - Build #${env.BUILD_NUMBER}",
                  body: """Pipeline ${env.JOB_NAME} - Build #${env.BUILD_NUMBER} failed.
