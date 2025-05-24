@@ -28,7 +28,6 @@ pipeline {
             --logger "trx;LogFileName=testresults.trx" \
             --results-directory TestResults
         '''
-        // Прибираємо старі XML, генеруємо нові, конвертуємо і публікуємо
         sh 'rm -rf TestResults/*.xml'
         sh '''
           export PATH="$PATH:$HOME/.dotnet/tools"
@@ -49,8 +48,14 @@ pipeline {
 
     stage('Start Dependencies') {
       steps {
-        // Піднімаємо всі сервіси з docker-compose.yml (мрежі, бд, кеш, rabbitmq тощо)
-        sh 'docker compose up -d'
+        script {
+          docker.image('docker/compose:1.29.2').inside(
+            '-v /var/run/docker.sock:/var/run/docker.sock ' +
+            "-v ${env.WORKSPACE}:${env.WORKSPACE} -w ${env.WORKSPACE}"
+          ) {
+            sh 'docker-compose up -d'
+          }
+        }
       }
     }
 
@@ -63,12 +68,18 @@ pipeline {
 
   post {
     always {
-      // Зупиняємо та видаляємо основний контейнер
+      // зупиняємо основний контейнер
       sh 'docker stop sessionmvc_container || true'
       sh 'docker rm   sessionmvc_container || true'
-
-      // Згортаємо залежності
-      sh 'docker compose down || true'
+      // згортаємо залежності
+      script {
+        docker.image('docker/compose:1.29.2').inside(
+          '-v /var/run/docker.sock:/var/run/docker.sock ' +
+          "-v ${env.WORKSPACE}:${env.WORKSPACE} -w ${env.WORKSPACE}"
+        ) {
+          sh 'docker-compose down || true'
+        }
+      }
     }
   }
 }
