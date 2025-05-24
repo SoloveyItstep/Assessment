@@ -1,3 +1,34 @@
+// Визначаємо допоміжні функції Groovy тут, ПОЗА блоком pipeline {}
+// Їх можна буде викликати з блоку environment або з script блоків.
+def determineDeployEnvironment(String branchName) {
+    if (branchName == null || branchName.isEmpty() || branchName == "null") {
+        // Якщо ім'я гілки не визначено, повертаємо дефолтне або обробляємо як помилку
+        echo "WARNING: Branch name is null or empty in determineDeployEnvironment. Defaulting to FeatureBranch."
+        return 'FeatureBranch' 
+    }
+    if (branchName == 'master' || branchName == 'main') {
+        return 'Production'
+    } else if (branchName == 'develop') {
+        return 'Development'
+    } else {
+        return 'FeatureBranch' // Або інше дефолтне значення для інших гілок
+    }
+}
+
+def determineAspNetCoreEnvironment(String branchName) {
+    if (branchName == null || branchName.isEmpty() || branchName == "null") {
+        echo "WARNING: Branch name is null or empty in determineAspNetCoreEnvironment. Defaulting to Development."
+        return 'Development'
+    }
+    if (branchName == 'master' || branchName == 'main') {
+        return 'Production'
+    } else if (branchName == 'develop') {
+        return 'Development'
+    } else {
+        return 'Development' // Для feature-гілок зазвичай використовують Development налаштування
+    }
+}
+
 pipeline {
     agent any 
 
@@ -6,39 +37,16 @@ pipeline {
         DOTNET_SDK_VERSION = '9.0'
         ERROR_NOTIFICATION_EMAIL = 'your-email@example.com' // ЗАМІНІТЬ
 
-        // Визначаємо змінні тут, використовуючи env.BRANCH_NAME, який має бути встановлений Jenkins
-        // Ці блоки виконаються на початку пайплайну на агенті.
+        // Викликаємо функції тут. env.BRANCH_NAME має бути доступний на момент обчислення environment.
+        // Jenkins спочатку отримує Jenkinsfile, потім встановлює деякі базові змінні env (як BRANCH_NAME для multibranch),
+        // а потім обробляє блок environment.
         GIT_BRANCH_NAME              = "${env.BRANCH_NAME}"
         DEPLOY_ENVIRONMENT           = determineDeployEnvironment(env.BRANCH_NAME)
         ASPNETCORE_ENVIRONMENT_FOR_APP = determineAspNetCoreEnvironment(env.BRANCH_NAME)
         
-        // Теги образу також можна визначити тут, якщо shortCommit не потрібен динамічно на кожному етапі.
-        // Але для shortCommit потрібен sh, тому залишимо їх визначення в script блоці.
-        IMAGE_TAG_LATEST           = ""
-        IMAGE_TAG_COMMIT           = ""
-        IMAGE_TAG_ENV_SPECIFIC     = ""
-    }
-
-    // Допоміжні функції Groovy для визначення середовищ
-    // Їх можна винести в Shared Library, якщо пайплайнів багато.
-    def determineDeployEnvironment(String branchName) {
-        if (branchName == 'master' || branchName == 'main') {
-            return 'Production'
-        } else if (branchName == 'develop') {
-            return 'Development'
-        } else {
-            return 'FeatureBranch' // Або інше дефолтне значення для інших гілок
-        }
-    }
-
-    def determineAspNetCoreEnvironment(String branchName) {
-        if (branchName == 'master' || branchName == 'main') {
-            return 'Production'
-        } else if (branchName == 'develop') {
-            return 'Development'
-        } else {
-            return 'Development' // Для feature-гілок зазвичай використовують Development налаштування
-        }
+        IMAGE_TAG_LATEST           = "" // Будуть встановлені в script блоці
+        IMAGE_TAG_COMMIT           = "" // Будуть встановлені в script блоці
+        IMAGE_TAG_ENV_SPECIFIC     = "" // Будуть встановлені в script блоці
     }
 
     stages {
@@ -46,25 +54,25 @@ pipeline {
             steps {
                 script {
                     // Перевіряємо, чи змінні середовища встановлені коректно
-                    echo "Current Git branch (from env.BRANCH_NAME): ${env.GIT_BRANCH_NAME}"
+                    echo "Current Git branch (from env.BRANCH_NAME via env.GIT_BRANCH_NAME): ${env.GIT_BRANCH_NAME}"
                     if (env.GIT_BRANCH_NAME == null || env.GIT_BRANCH_NAME.isEmpty() || env.GIT_BRANCH_NAME == "null") {
-                        error "FATAL: Could not determine current Git branch. env.BRANCH_NAME is '${env.GIT_BRANCH_NAME}'"
+                        // Ця помилка має оброблятися всередині функцій determine*, але дублюємо перевірку тут для ясності
+                        error "FATAL: Could not determine current Git branch. env.BRANCH_NAME was '${env.BRANCH_NAME}'"
                     }
                     
                     echo "Deployment Environment: ${env.DEPLOY_ENVIRONMENT}"
                     echo "ASPNETCORE_ENVIRONMENT for application: ${env.ASPNETCORE_ENVIRONMENT_FOR_APP}"
 
-                    // Визначаємо теги для Docker-образу (тут, бо потрібен checkout для shortCommit)
+                    // Визначаємо теги для Docker-образу
                     def shortCommit = sh(script: 'git rev-parse --short HEAD', returnStdout: true).trim()
                     env.IMAGE_TAG_LATEST = "${env.APP_IMAGE_NAME}:latest"
                     env.IMAGE_TAG_COMMIT = "${env.APP_IMAGE_NAME}:${shortCommit}"
-                    // Перевірка на null перед toLowerCase()
-                    if (env.DEPLOY_ENVIRONMENT != null) {
+                    
+                    if (env.DEPLOY_ENVIRONMENT != null && env.DEPLOY_ENVIRONMENT != "null") {
                         env.IMAGE_TAG_ENV_SPECIFIC = "${env.APP_IMAGE_NAME}:${env.DEPLOY_ENVIRONMENT.toLowerCase()}-${shortCommit}"
                     } else {
-                        // Це не повинно трапитися, якщо GIT_BRANCH_NAME визначено
                         env.IMAGE_TAG_ENV_SPECIFIC = "${env.APP_IMAGE_NAME}:unknownenv-${shortCommit}" 
-                        echo "WARNING: DEPLOY_ENVIRONMENT was null when creating IMAGE_TAG_ENV_SPECIFIC."
+                        echo "WARNING: DEPLOY_ENVIRONMENT was null or 'null' when creating IMAGE_TAG_ENV_SPECIFIC."
                     }
                     
                     echo "Image tags will be: ${env.IMAGE_TAG_LATEST}, ${env.IMAGE_TAG_COMMIT}, ${env.IMAGE_TAG_ENV_SPECIFIC}"
@@ -72,8 +80,10 @@ pipeline {
             }
         }
 
+        // ... (решта етапів Build Application, Test Application, Build Docker Image, Push Docker Image, Deploy to Environment, Git Tagging for Production
+        //      залишаються такими ж, як у попередньому файлі, який я надавав, де вони вже були налаштовані)
+
         stage('Build Application (.NET)') {
-            // ... (решта етапів залишаються такими ж, як у попередній версії)
             agent {
                 docker {
                     image "mcr.microsoft.com/dotnet/sdk:${env.DOTNET_SDK_VERSION}"
@@ -99,8 +109,10 @@ pipeline {
 
         stage('Build Docker Image') {
             steps {
-                echo "Building Docker image with tags: ${env.IMAGE_TAG_LATEST}, ${env.IMAGE_TAG_COMMIT}, ${env.IMAGE_TAG_ENV_SPECIFIC}"
-                sh "docker build -t ${env.IMAGE_TAG_LATEST} -t ${env.IMAGE_TAG_COMMIT} -t ${env.IMAGE_TAG_ENV_SPECIFIC} ."
+                script { // Додано script блок для безпечного доступу до env змінних у рядку
+                    echo "Building Docker image with tags: ${env.IMAGE_TAG_LATEST}, ${env.IMAGE_TAG_COMMIT}, ${env.IMAGE_TAG_ENV_SPECIFIC}"
+                    sh "docker build -t \"${env.IMAGE_TAG_LATEST}\" -t \"${env.IMAGE_TAG_COMMIT}\" -t \"${env.IMAGE_TAG_ENV_SPECIFIC}\" ."
+                }
             }
         }
 
@@ -124,19 +136,18 @@ pipeline {
                     echo "Preparing to deploy to ${env.DEPLOY_ENVIRONMENT} environment using ASPNETCORE_ENVIRONMENT=${env.ASPNETCORE_ENVIRONMENT_FOR_APP}"
                     
                     def composeFiles = "-f docker-compose.yml"
-                    // Перевірка на null перед toLowerCase()
-                    def overrideFileName = env.DEPLOY_ENVIRONMENT != null ? "docker-compose.${env.DEPLOY_ENVIRONMENT.toLowerCase()}.yml" : null
+                    def overrideFileName = (env.DEPLOY_ENVIRONMENT != null && env.DEPLOY_ENVIRONMENT != "null") ? "docker-compose.${env.DEPLOY_ENVIRONMENT.toLowerCase()}.yml" : null
                     
                     if (overrideFileName != null && fileExists(overrideFileName)) {
                         composeFiles += " -f ${overrideFileName}"
                         echo "Using override file: ${overrideFileName}"
                     } else {
-                        if (env.DEPLOY_ENVIRONMENT == 'Production' && overrideFileName != null) {
+                        if (env.DEPLOY_ENVIRONMENT == 'Production' && overrideFileName != null) { // overrideFileName буде null, якщо DEPLOY_ENVIRONMENT null
                             echo "WARNING: Production override file (${overrideFileName}) not found! Using default docker-compose.yml for Production."
-                        } else if (overrideFileName != null) {
-                            echo "No specific override file found for ${env.DEPLOY_ENVIRONMENT} (${overrideFileName}), using default docker-compose.yml."
+                        } else if (overrideFileName != null || (env.DEPLOY_ENVIRONMENT != null && env.DEPLOY_ENVIRONMENT != "null")) { // Додано умову, щоб уникнути логування, якщо DEPLOY_ENVIRONMENT null
+                            echo "No specific override file found for ${env.DEPLOY_ENVIRONMENT} (${overrideFileName ?: 'N/A'}), using default docker-compose.yml."
                         } else {
-                            echo "DEPLOY_ENVIRONMENT is null, using default docker-compose.yml."
+                            echo "DEPLOY_ENVIRONMENT is null or invalid, using default docker-compose.yml."
                         }
                     }
 
@@ -160,8 +171,7 @@ pipeline {
             }
             steps {
                 script {
-                    // ... (код для тегування, як у попередній версії)
-                    def tagName = "v${new Date().format('yyyyMMdd.HHmmss')}-${env.DEPLOY_ENVIRONMENT.toLowerCase()}"
+                    def tagName = (env.DEPLOY_ENVIRONMENT != null && env.DEPLOY_ENVIRONMENT != "null") ? "v${new Date().format('yyyyMMdd.HHmmss')}-${env.DEPLOY_ENVIRONMENT.toLowerCase()}" : "v${new Date().format('yyyyMMdd.HHmmss')}-unknownenv"
                     echo "Creating Git tag: ${tagName}"
                     sh "git tag ${tagName}"
                     echo "Attempting to push Git tag: ${tagName}"
