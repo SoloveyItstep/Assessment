@@ -3,6 +3,10 @@ pipeline {
 
     environment {
         DOCKER_IMAGE = 'sessionmvc-app:latest'
+        // Оновимо версію docker-compose.
+        // Замість docker/compose:1.29.2 використовуємо docker/cli:latest
+        // і викликаємо docker compose як плагін.
+        DOCKER_COMPOSE_CLI_IMAGE = 'docker/cli:latest' // Або конкретна версія, наприклад, 'docker/cli:20.10.17'
     }
 
     stages {
@@ -49,18 +53,19 @@ pipeline {
 
         stage('Start Dependencies') {
             steps {
-                echo "DEBUG: Current working directory before docker-compose:"
+                echo "DEBUG: Current working directory before docker-compose up:"
                 sh 'pwd'
                 echo "DEBUG: Listing contents of current directory:"
-                sh 'ls -la' // Це покаже вміст $WORKSPACE
+                sh 'ls -la'
 
+                // Змінена команда для запуску docker-compose через docker/cli
                 sh '''
                     docker run --rm \
                         -v /var/run/docker.sock:/var/run/docker.sock \
                         -v $WORKSPACE:$WORKSPACE \
                         -w $WORKSPACE \
-                        docker/compose:1.29.2 \
-                        up -d
+                        ${DOCKER_COMPOSE_CLI_IMAGE} \
+                        compose up -d
                 '''
             }
         }
@@ -68,9 +73,8 @@ pipeline {
         stage('Run App Container') {
             steps {
                 sh "docker run -d -p 8081:5000 --name sessionmvc_container $DOCKER_IMAGE"
-                // Можливо, тут потрібна невелика затримка, якщо додаток швидко запускається,
-                // але Health Checks в docker-compose вже забезпечують очікування баз.
-                // sh 'sleep 5'
+                // Оскільки healthchecks налаштовані в docker-compose, чекати окремо не потрібно.
+                // Якщо раптом виникнуть проблеми зі стартом, можна додати sleep або wait-for-it.
             }
         }
     }
@@ -83,15 +87,16 @@ pipeline {
             echo "DEBUG: Current working directory before docker-compose down (post-action):"
             sh 'pwd'
             echo "DEBUG: Listing contents of current directory (post-action):"
-            sh 'ls -la' // Це також покаже вміст $WORKSPACE в post-дії
+            sh 'ls -la'
 
+            // Змінена команда для зупинки docker-compose через docker/cli
             sh '''
                 docker run --rm \
                     -v /var/run/docker.sock:/var/run/docker.sock \
                     -v $WORKSPACE:$WORKSPACE \
                     -w $WORKSPACE \
-                    docker/compose:1.29.2 \
-                    down
+                    ${DOCKER_COMPOSE_CLI_IMAGE} \
+                    compose down
             '''
         }
     }
