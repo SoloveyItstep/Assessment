@@ -46,21 +46,8 @@ pipeline {
                 }
             }
             steps {
-                echo "Running .NET tests (Solution: Assessment.sln)..." // Змінено тут
-                sh 'dotnet test Assessment.sln --configuration Release --no-build' // І тут
-            }
-        }
-
-        stage('Test Application (.NET)') {
-            agent {
-                docker {
-                    image "mcr.microsoft.com/dotnet/sdk:${env.DOTNET_SDK_VERSION}"
-                }
-            }
-            steps {
-                echo "Running .NET tests (Solution: SessionMvc.sln)..."
-                // Запускаємо тести для всього рішення, не збираючи проєкт заново
-                sh 'dotnet test SessionMvc.sln --configuration Release --no-build'
+                echo "Running .NET tests (Solution: Assessment.sln)..."
+                sh 'dotnet test Assessment.sln --configuration Release --no-build'
             }
         }
 
