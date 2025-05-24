@@ -33,7 +33,7 @@ pipeline {
         }
       }
       steps {
-        // 1) Запустити тести в TRX
+        // Запуск тестів із TRX-логером
         sh '''
           dotnet test Assessment.sln \
             --no-build --configuration Release \
@@ -41,23 +41,23 @@ pipeline {
             --results-directory ./TestResults
         '''
 
-        // 2) Очистити старий XML
-        sh 'rm -f TestResults/testresults.xml'
+        // Почистимо старі XML (файли та папки)
+        sh 'rm -rf TestResults/*.xml TestResults/*.xml*/'
 
-        // 3) Інсталювати (якщо треба) та конвертувати TRX → JUnit XML
+        // Встановлюємо trx2junit (якщо потрібно) і конвертуємо у JUnit XML
         sh '''
           export PATH="$PATH:$HOME/.dotnet/tools"
           if ! command -v trx2junit >/dev/null 2>&1; then
             dotnet tool install --global trx2junit
           fi
-          trx2junit TestResults/testresults.trx --output TestResults/testresults.xml
+          trx2junit ./TestResults/testresults.trx
         '''
 
-        // 4) Опціонально вивести XML для дебагу
-        sh 'cat TestResults/testresults.xml || true'
+        // Перевіримо, що зʼявився XML-звіт
+        sh 'ls -la TestResults'
 
-        // 5) Публікація у Jenkins
-        junit 'TestResults/testresults.xml'
+        // Публікуємо всі JUnit-звіти
+        junit 'TestResults/*.xml'
       }
     }
 
@@ -82,7 +82,6 @@ pipeline {
 
   post {
     always {
-      // Прибирання контейнера
       sh 'docker stop sessionmvc_container || true'
       sh 'docker rm   sessionmvc_container || true'
     }
