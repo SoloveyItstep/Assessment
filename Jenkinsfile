@@ -7,7 +7,6 @@ pipeline {
         DOCKER_CLI_IMAGE = 'docker/cli:24.0.9' // Або іншу стабільну версію, яку ви можете знайти на Docker Hub.
                                                 // Важливо: переконайтеся, що цей образ має в собі плагін 'compose'.
                                                 // Більшість сучасних офіційних образів docker/cli його мають.
-        DOCKER_COMPOSE_CUSTOM_IMAGE = 'ubuntu:latest'
     }
 
     stages {
@@ -59,21 +58,14 @@ pipeline {
                 echo "DEBUG: Listing contents of current directory:"
                 sh 'ls -la'
 
-                // Запускаємо контейнер, встановлюємо docker-compose, а потім виконуємо команду
+                // Використовуємо docker/cli:24.0.9 і новий синтаксис 'compose'
                 sh '''
                     docker run --rm \
                         -v /var/run/docker.sock:/var/run/docker.sock \
                         -v $WORKSPACE:$WORKSPACE \
                         -w $WORKSPACE \
-                        ${DOCKER_COMPOSE_CUSTOM_IMAGE} \
-                        bash -c " \
-                            apt-get update && \
-                            apt-get install -y curl && \
-                            curl -L https://github.com/docker/compose/releases/download/v2.27.0/docker-compose-$(uname -s)-$(uname -m) -o /usr/local/bin/docker-compose && \
-                            chmod +x /usr/local/bin/docker-compose && \
-                            docker-compose version && \
-                            docker-compose up -d \
-                        "
+                        ${DOCKER_CLI_IMAGE} \
+                        compose up -d
                 '''
             }
         }
@@ -87,20 +79,22 @@ pipeline {
 
     post {
         always {
-            // ...
+            sh 'docker stop sessionmvc_container || true'
+            sh 'docker rm sessionmvc_container || true'
+
+            echo "DEBUG: Current working directory before docker-compose down (post-action):"
+            sh 'pwd'
+            echo "DEBUG: Listing contents of current directory (post-action):"
+            sh 'ls -la'
+
+            // Використовуємо docker/cli:24.0.9 і новий синтаксис 'compose'
             sh '''
                 docker run --rm \
                     -v /var/run/docker.sock:/var/run/docker.sock \
                     -v $WORKSPACE:$WORKSPACE \
                     -w $WORKSPACE \
-                    ${DOCKER_COMPOSE_CUSTOM_IMAGE} \
-                    bash -c " \
-                        apt-get update && \
-                        apt-get install -y curl && \
-                        curl -L https://github.com/docker/compose/releases/download/v2.27.0/docker-compose-$(uname -s)-$(uname -m) -o /usr/local/bin/docker-compose && \
-                        chmod +x /usr/local/bin/docker-compose && \
-                        docker-compose down \
-                    "
+                    ${DOCKER_CLI_IMAGE} \
+                    compose down
             '''
         }
     }
