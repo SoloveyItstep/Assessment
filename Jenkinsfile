@@ -1,139 +1,134 @@
 pipeline {
+    // Глобальний агент можна залишити 'any', якщо Jenkins має доступ до Docker CLI хоста.
+    // Або на кожному етапі визначити свого агента.
     agent any
 
     environment {
-        DOCKER_IMAGE = 'sessionmvc-app:latest'
-        DOCKER_BASE_IMAGE = 'alpine/git' // Цей образ використовується для виконання команд Docker Compose
-        DOCKER_COMPOSE_VERSION = '2.27.0' // Версія Docker Compose, яку ми завантажимо
+        // Змінні середовища, які можуть знадобитися
+        // Наприклад, ім'я вашого образу та користувача в Docker Hub (якщо використовуєте)
+        // Для тегування образу можна використовувати короткий хеш коміту
+        // GIT_SHORT_COMMIT = sh(script: 'git rev-parse --short HEAD', returnStdout: true).trim()
+        // IMAGE_NAME = 'sessionmvc'
+        // DOCKER_REGISTRY_USER = 'yourdockerhubusername' // Замініть на ваше ім'я користувача
     }
 
     stages {
         stage('Checkout') {
             steps {
-                checkout scm
+                // Завантажуємо код з репозиторію
+                git url: 'https://github.com/SoloveyItstep/Assessment.git', branch: 'master'
+                script {
+                    // Визначаємо змінні після завантаження коду
+                    env.GIT_SHORT_COMMIT = sh(script: 'git rev-parse --short HEAD', returnStdout: true).trim()
+                    // Замініть 'yourusername/sessionmvc' на ваш реальний шлях до образу (наприклад, Docker Hub username/repository)
+                    // Або просто ім'я образу, якщо не використовуєте публічний/приватний реєстр
+                    env.IMAGE_NAME_WITH_REGISTRY = "yourusername/sessionmvc" // Наприклад: vsolovey/sessionmvc
+                    env.IMAGE_TAG_LATEST = "${env.IMAGE_NAME_WITH_REGISTRY}:latest"
+                    env.IMAGE_TAG_COMMIT = "${env.IMAGE_NAME_WITH_REGISTRY}:${env.GIT_SHORT_COMMIT}"
+                }
             }
         }
 
-        stage('Build & Test') {
+        stage('Build Application (npm)') {
             agent {
+                // Використовуємо Docker-контейнер з Node.js для збірки
                 docker {
-                    image 'mcr.microsoft.com/dotnet/sdk:9.0'
-                    args '-v /var/run/docker.sock:/var/run/docker.sock' // Для доступу до Docker Daemon з контейнера SDK
+                    image 'node:16-alpine' // Або інша версія Node.js, яка вам потрібна
+                    // можна додати args '-u root' якщо є проблеми з правами npm
                 }
             }
             steps {
-                sh 'dotnet restore Assessment.sln'
-                sh 'dotnet build Assessment.sln --configuration Release --no-restore'
-                sh '''
-                    dotnet test Assessment.sln \\
-                      --no-build --configuration Release \\
-                      --logger "trx;LogFileName=testresults.trx" \\
-                      --results-directory TestResults
-                '''
-                junit 'TestResults/*.xml'
-                sh 'mkdir -p TestResults'
-                sh 'rm -f TestResults/testresults.xml'
-                sh '''
-                    export PATH="$PATH:$HOME/.dotnet/tools"
-                    if ! command -v trx2junit >/dev/null 2>&1; then
-                        dotnet tool install --global trx2junit
-                    fi
-                    trx2junit TestResults/testresults.trx
-                '''
+                echo 'Building the application with npm...'
+                sh 'npm install'
+                sh 'npm run build'
             }
         }
 
-        stage('Docker Build') {
-            steps {
-                // Збираємо образ вашого додатка. Виконується на Jenkins-агенті (який має доступ до Docker).
-                sh 'docker build -t $DOCKER_IMAGE .'
-            }
-        }
-
-        stage('Start Dependencies') {
-            // Цей етап запускає docker-compose. Ми використовуємо спеціальний Docker-образ,
-            // який завантажить та виконає docker-compose.
+        stage('Test Application (npm)') {
             agent {
+                // Використовуємо той самий Docker-контейнер для тестів
                 docker {
-                    image "${DOCKER_BASE_IMAGE}"
-                    args '-v /var/run/docker.sock:/var/run/docker.sock' // Надаємо доступ до Docker Daemon хоста
+                    image 'node:16-alpine' // Та сама версія Node.js
                 }
             }
             steps {
-                echo "DEBUG: Current working directory inside ${DOCKER_BASE_IMAGE} container:"
-                sh 'pwd'
-                echo "DEBUG: Listing contents inside ${DOCKER_BASE_IMAGE} container:"
-                sh 'ls -la'
-                echo "Installing Docker Compose v${DOCKER_COMPOSE_VERSION}..."
-                sh '''
-                    # Встановлюємо curl, необхідний для завантаження docker-compose
-                    apk add --no-cache curl
-
-                    # Завантажуємо бінарник Docker Compose v2.x.x
-                    # $(uname -s)-$(uname -m) автоматично визначить операційну систему та архітектуру (наприклад, linux-x86_64)
-                    curl -L "https://github.com/docker/compose/releases/download/v${DOCKER_COMPOSE_VERSION}/docker-compose-linux-$(uname -m)" \\
-                    -o /usr/local/bin/docker-compose
-
-                    # Робимо бінарний файл виконуваним
-                    chmod +x /usr/local/bin/docker-compose
-
-                    # Перевіряємо версію Docker Compose (для відладки)
-                    docker-compose version
-
-                    echo "Starting Docker Compose services..."
-                    # Запускаємо сервіси, визначені в docker-compose.yml, у фоновому режимі (-d)
-                    docker-compose up -d
-                '''
+                echo 'Running tests with npm...'
+                sh 'npm run test'
             }
         }
 
-        stage('Run App Container') {
-            // Запускаємо контейнер вашого додатка.
-            // Ми можемо використовувати той самий агент, що й для docker-compose, або будь-який інший.
-            agent {
-                docker {
-                    image "${DOCKER_BASE_IMAGE}" // РЯДОК, ЯКИЙ ВИ ПОВИННІ ПЕРЕВІРИТИ!
-                    args '-v /var/run/docker.sock:/var/run/docker.sock'
-                }
+        stage('Build Docker Image') {
+            // Цей етап виконується на агенті Jenkins, який має доступ до Docker CLI
+            // і Docker-демону (якщо Jenkins в Docker, то сокет має бути прокинутий)
+            steps {
+                echo "Building Docker image ${env.IMAGE_TAG_LATEST} and ${env.IMAGE_TAG_COMMIT}..."
+                // Припускаємо, що Dockerfile знаходиться в корені проєкту
+                // Команда docker build -t <ім'я_образу>:<тег> .
+                sh "docker build -t ${env.IMAGE_TAG_LATEST} -t ${env.IMAGE_TAG_COMMIT} ."
+            }
+        }
+
+        stage('Push Docker Image (Optional)') {
+            // Цей етап для завантаження образу в Docker-реєстр (наприклад, Docker Hub)
+            // Його можна пропустити, якщо ви використовуєте образи локально.
+            // Потрібно налаштувати credentials в Jenkins для доступу до реєстру.
+            when {
+                // Можна додати умову, наприклад, виконувати тільки для гілки master
+                // branch 'master'
+                expression { true } // Поки що виконується завжди, якщо розкоментовано
             }
             steps {
-                echo "Running application container..."
-                // Запускаємо контейнер sessionmvc, мапимо порт 8081 хоста на 5000 контейнера,
-                // і даємо йому ім'я sessionmvc_container.
-                sh "docker run -d -p 8081:5000 --name sessionmvc_container $DOCKER_IMAGE"
+                echo "Pushing Docker images..."
+                // Приклад з використанням Jenkins Credentials Binding plugin для Docker Hub
+                // Вам потрібно буде створити 'Username with password' credential в Jenkins
+                // з ID, наприклад, 'dockerhub-credentials'
+                // withCredentials([usernamePassword(credentialsId: 'dockerhub-credentials', usernameVariable: 'DOCKER_USER', passwordVariable: 'DOCKER_PASS')]) {
+                //    sh "echo \"${DOCKER_PASS}\" | docker login -u \"${DOCKER_USER}\" --password-stdin"
+                //    sh "docker push ${env.IMAGE_TAG_LATEST}"
+                //    sh "docker push ${env.IMAGE_TAG_COMMIT}"
+                // }
+                // Якщо поки що не налаштували credentials, закоментуйте або видаліть вміст steps
+                // Для локального використання push не потрібен.
+                echo "Skipping Docker Push for now. Configure credentials if needed."
+            }
+        }
+
+        stage('Deploy with Docker Compose') {
+            // Цей етап також потребує доступу до Docker CLI та docker-compose
+            steps {
+                echo 'Deploying application using Docker Compose...'
+                // Припускаємо, що docker-compose.yml знаходиться в корені проєкту
+                // або ви вкажете до нього шлях: -f path/to/your/docker-compose.yml
+                
+                // Якщо ви завантажили образ в реєстр, і ваш docker-compose.yml використовує це ім'я образу:
+                // sh "docker-compose pull sessionmvc" // Завантажує останню версію образу sessionmvc
+
+                // Перезапускає сервіс sessionmvc, перебудовуючи образ, якщо потрібно (згідно з Dockerfile)
+                // Якщо ваш docker-compose.yml містить 'build: .' для sessionmvc
+                sh "docker-compose up -d --build sessionmvc"
+                
+                // Або якщо образ вже зібраний і затеганий (і docker-compose.yml посилається на нього, наприклад, sessionmvc:latest):
+                // sh "docker-compose up -d --force-recreate sessionmvc"
+
+                // Для оновлення всіх сервісів, визначених у docker-compose.yml:
+                // sh "docker-compose up -d --build" // Якщо потрібно перебудувати всі образи з локальним build context
+                // sh "docker-compose up -d --force-recreate" // Якщо образи вже є і їх треба просто перезапустити
             }
         }
     }
 
     post {
         always {
-            echo "Stopping and removing containers in post-build action..."
-            // Зупиняємо та видаляємо контейнер додатка. '|| true' запобігає падінню пайплайну,
-            // якщо контейнер вже не існує (наприклад, попередній запуск не вдався повністю).
-            sh 'docker stop sessionmvc_container || true'
-            sh 'docker rm sessionmvc_container || true'
-
-            // Зупиняємо та видаляємо сервіси, запущені за допомогою docker-compose.
-            agent {
-                docker {
-                    image "${DOCKER_BASE_IMAGE}" // РЯДОК 118, ЯКИЙ ВИКЛИКАВ ПОМИЛКУ! Переконайтеся, що він тут.
-                    args '-v /var/run/docker.sock:/var/run/docker.sock'
-                }
-            }
-            steps {
-                echo "Stopping Docker Compose services..."
-                sh '''
-                    # Встановлюємо curl та docker-compose ще раз на випадок, якщо це окремий виклик
-                    # або агент перепідключився. Це забезпечує надійність.
-                    apk add --no-cache curl
-                    curl -L "https://github.com/docker/compose/releases/download/v${DOCKER_COMPOSE_VERSION}/docker-compose-linux-$(uname -m)" \\
-                    -o /usr/local/bin/docker-compose
-                    chmod +x /usr/local/bin/docker-compose
-
-                    # Зупиняємо та видаляємо сервіси та їхні томи (--volumes)
-                    docker-compose down --volumes
-                '''
-            }
+            echo 'Pipeline finished.'
+            // Очищення робочої області Jenkins
+            cleanWs()
+        }
+        success {
+            echo 'Pipeline succeeded!'
+        }
+        failure {
+            echo 'Pipeline failed!'
+            // Тут можна додати сповіщення про помилку (наприклад, на email або в Slack)
         }
     }
 }
