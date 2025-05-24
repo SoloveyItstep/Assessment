@@ -36,6 +36,11 @@ pipeline {
         sh 'docker build -t $DOCKER_IMAGE .'
       }
     }
+    stage('Start Dependencies') {
+      steps {
+        sh 'docker-compose up -d'
+      }
+    }
 
     stage('Run Docker Container') {
       steps {
