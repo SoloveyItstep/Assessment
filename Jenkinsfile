@@ -1,5 +1,5 @@
 pipeline {
-    agent none // Глобального агента не визначаємо
+    agent none 
     stages {
         stage('.NET Build and Test') {
             agent {
@@ -51,7 +51,7 @@ pipeline {
                         echo "Workspace contents:"
                         sh 'ls -la' 
                         
-                        // Dockerfile тепер у корені
+                        // ВИПРАВЛЕНО: Dockerfile тепер у корені
                         def appImage = docker.build("sessionmvc-app:${env.BUILD_NUMBER}", "-f Dockerfile .")
                         echo "Successfully built Docker image: ${appImage.id}"
                     } catch (e) {
@@ -67,10 +67,17 @@ pipeline {
             steps {
                 script {
                     echo 'Running the SessionMVC Docker image with environment variables...'
-                    // ВИПРАВЛЕНО: Додано змінні середовища для рядків підключення
-                    // Важливо: паролі та чутливі дані краще передавати через Jenkins Credentials
                     def sqlConnectionString = "Server=db;Database=Assessment;User=sa;Password=Your_password123;Encrypt=False;TrustServerCertificate=True"
-                    def mongoConnectionString = "mongodb://mongo:27017/Assessment?directConnection=true" // Замініть Assessment на вашу БД Mongo, якщо потрібно
+                    // Переконайтеся, що 'Assessment' - правильна назва БД для Mongo
+                    def mongoConnectionString = "mongodb://mongo:27017/Assessment?directConnection=true" 
+
+                    // Важливо: Переконайтеся, що залежні сервіси (db, mongo, rabbitmq) запущені,
+                    // якщо цей Jenkins пайплайн не керує їх запуском через docker-compose.
+                    // Для цього тестового запуску, ми припускаємо, що вони можуть бути недоступні,
+                    // але додаток має запуститися без падіння через HTTPS.
+                    
+                    // Видаляємо попередній контейнер, якщо він існує (щоб уникнути конфлікту імен)
+                    sh "docker rm -f sessionmvc-run-${env.BUILD_NUMBER} || true"
 
                     sh """
                         docker run -d \
@@ -82,15 +89,14 @@ pipeline {
                             sessionmvc-app:${env.BUILD_NUMBER}
                     """
                     echo "SessionMVC app starting on http://localhost:8081"
-                    echo "Waiting for services to become healthy (this requires other containers like db, mongo, rabbitmq to be running separately if not managed by this Jenkins job)"
-                    sh "sleep 30" // Збільшено час очікування, щоб дати шанс базам даних запуститися, ЯКЩО вони запускаються окремо
+                    echo "Waiting for 30 seconds..."
+                    sh "sleep 30" 
 
-                    // Перевірка логів контейнера, якщо він впав
-                    echo "Checking container status..."
+                    echo "Checking container status for sessionmvc-run-${env.BUILD_NUMBER}:"
                     sh "docker ps -a --filter name=sessionmvc-run-${env.BUILD_NUMBER}"
                     echo "Fetching logs from sessionmvc-run-${env.BUILD_NUMBER}:"
-                    sh "docker logs sessionmvc-run-${env.BUILD_NUMBER} || echo 'Could not fetch logs, container might have exited quickly.'"
-
+                    // Додаємо --tail, щоб отримати останні логи, і || true, щоб не падати, якщо логів немає
+                    sh "docker logs --tail 100 sessionmvc-run-${env.BUILD_NUMBER} || echo 'Could not fetch logs or container exited.'"
 
                     echo "Stopping and removing the SessionMVC container..."
                     sh "docker stop sessionmvc-run-${env.BUILD_NUMBER} || echo 'Container already stopped or not found'"
