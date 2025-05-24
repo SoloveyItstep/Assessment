@@ -71,8 +71,8 @@ services:
       #- MongoConnectionString=mongodb://root:example@mongo:27017/Assessment?authSource=admin&directConnection=true
       # ВИПРАВЛЕНО: Чітко вказуємо Kestrel слухати тільки HTTP на порту 5000 всередині контейнера
       - ASPNETCORE_URLS=http://+:5000
-    ports:
-      - "8083:5000" 
+    #ports:
+    #  - "8083:5000" 
     depends_on:
       db:
         condition: service_healthy
