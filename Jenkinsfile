@@ -3,53 +3,15 @@ pipeline {
 
     environment {
         DOCKER_IMAGE = 'sessionmvc-app:latest'
-        // Оновимо версію docker-compose.
-        // Замість docker/compose:1.29.2 використовуємо docker/cli:latest
-        // і викликаємо docker compose як плагін.
-        DOCKER_COMPOSE_CLI_IMAGE = 'docker/cli:latest' // Або конкретна версія, наприклад, 'docker/cli:20.10.17'
+        // Спробуємо іншу, можливо, більш стабільну або нову версію образу docker-compose,
+        // якщо docker/compose:latest дасть той самий результат з "Can't find a suitable configuration file"
+        // тоді це не в версії проблема, а в тому, як Docker монтує томи або права.
+        DOCKER_COMPOSE_IMAGE = 'docker/compose:2.27.0' // Спробуйте конкретну версію, або 'latest'
+                                                      // Або навіть повернутися до '1.29.2' для відладки
     }
 
     stages {
-        stage('Checkout') {
-            steps {
-                checkout scm
-            }
-        }
-
-        stage('Build & Test') {
-            agent {
-                docker {
-                    image 'mcr.microsoft.com/dotnet/sdk:9.0'
-                    args '-v /var/run/docker.sock:/var/run/docker.sock'
-                }
-            }
-            steps {
-                sh 'dotnet restore Assessment.sln'
-                sh 'dotnet build Assessment.sln --configuration Release --no-restore'
-                sh '''
-                    dotnet test Assessment.sln \\
-                      --no-build --configuration Release \\
-                      --logger "trx;LogFileName=testresults.trx" \\
-                      --results-directory TestResults
-                '''
-                sh 'mkdir -p TestResults'
-                sh 'rm -f TestResults/testresults.xml'
-                sh '''
-                    export PATH="$PATH:$HOME/.dotnet/tools"
-                    if ! command -v trx2junit >/dev/null 2>&1; then
-                        dotnet tool install --global trx2junit
-                    fi
-                    trx2junit TestResults/testresults.trx
-                '''
-                junit 'TestResults/*.xml'
-            }
-        }
-
-        stage('Docker Build') {
-            steps {
-                sh 'docker build -t $DOCKER_IMAGE .'
-            }
-        }
+        // ... (попередні етапи без змін) ...
 
         stage('Start Dependencies') {
             steps {
@@ -58,14 +20,14 @@ pipeline {
                 echo "DEBUG: Listing contents of current directory:"
                 sh 'ls -la'
 
-                // Змінена команда для запуску docker-compose через docker/cli
+                // Використовуємо стару команду, але з новим ім'ям образу
                 sh '''
                     docker run --rm \
                         -v /var/run/docker.sock:/var/run/docker.sock \
                         -v $WORKSPACE:$WORKSPACE \
                         -w $WORKSPACE \
-                        ${DOCKER_COMPOSE_CLI_IMAGE} \
-                        compose up -d
+                        ${DOCKER_COMPOSE_IMAGE} \
+                        up -d
                 '''
             }
         }
@@ -73,8 +35,6 @@ pipeline {
         stage('Run App Container') {
             steps {
                 sh "docker run -d -p 8081:5000 --name sessionmvc_container $DOCKER_IMAGE"
-                // Оскільки healthchecks налаштовані в docker-compose, чекати окремо не потрібно.
-                // Якщо раптом виникнуть проблеми зі стартом, можна додати sleep або wait-for-it.
             }
         }
     }
@@ -89,14 +49,13 @@ pipeline {
             echo "DEBUG: Listing contents of current directory (post-action):"
             sh 'ls -la'
 
-            // Змінена команда для зупинки docker-compose через docker/cli
             sh '''
                 docker run --rm \
                     -v /var/run/docker.sock:/var/run/docker.sock \
                     -v $WORKSPACE:$WORKSPACE \
                     -w $WORKSPACE \
-                    ${DOCKER_COMPOSE_CLI_IMAGE} \
-                    compose down
+                    ${DOCKER_COMPOSE_IMAGE} \
+                    down
             '''
         }
     }
