@@ -92,7 +92,7 @@ pipeline {
             // Ми можемо використовувати той самий агент, що й для docker-compose, або будь-який інший.
             agent {
                 docker {
-                    image "${DOCKER_BASE_IMAGE}" // РЯДОК 107 В ОСТАННІЙ ПОМИЛЦІ. Переконайтеся, що він тут!
+                    image "${DOCKER_BASE_IMAGE}" // РЯДОК, ЯКИЙ ВИ ПОВИННІ ПЕРЕВІРИТИ!
                     args '-v /var/run/docker.sock:/var/run/docker.sock'
                 }
             }
@@ -116,7 +116,7 @@ pipeline {
             // Зупиняємо та видаляємо сервіси, запущені за допомогою docker-compose.
             agent {
                 docker {
-                    image "${DOCKER_BASE_IMAGE}"
+                    image "${DOCKER_BASE_IMAGE}" // РЯДОК 118, ЯКИЙ ВИКЛИКАВ ПОМИЛКУ! Переконайтеся, що він тут.
                     args '-v /var/run/docker.sock:/var/run/docker.sock'
                 }
             }
