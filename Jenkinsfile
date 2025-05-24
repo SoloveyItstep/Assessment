@@ -73,26 +73,23 @@ pipeline {
 
                     sh "docker rm -f sessionmvc-run-${env.BUILD_NUMBER} || true"
 
-                    // ВИПРАВЛЕНО: Прибрано --network devnetwork для цього ізольованого тестового запуску.
-                    // Додаток, ймовірно, не зможе підключитися до БД на цьому етапі (якщо БД в іншій мережі),
-                    // але сам контейнер має запуститися без помилки "network not found".
+                    // ВИКОРИСТОВУЄМО ПОРТ ХОСТА 8082, щоб уникнути конфлікту з docker-compose, якщо він запущений
                     sh """
                         docker run -d \
-                            -p 8081:5000 \
+                            -p 8082:5000 \
                             --name sessionmvc-run-${env.BUILD_NUMBER} \
                             -e ASPNETCORE_ENVIRONMENT=Development \
                             -e "ConnectionStrings__AssessmentDbConnectionString=${sqlConnectionString}" \
                             -e "MongoConnectionString=${mongoConnectionStringVal}" \
                             sessionmvc-app:${env.BUILD_NUMBER}
                     """
-                    echo "SessionMVC app starting on http://localhost:8081"
+                    echo "SessionMVC app starting on http://localhost:8082" // Оновлено порт
                     echo "Waiting for 30 seconds..."
                     sh "sleep 30" 
 
                     echo "Checking container status for sessionmvc-run-${env.BUILD_NUMBER}:"
                     sh "docker ps -a --filter name=sessionmvc-run-${env.BUILD_NUMBER}"
                     echo "Fetching logs from sessionmvc-run-${env.BUILD_NUMBER}:"
-                    // Збільшено кількість рядків логу для кращої діагностики
                     sh "docker logs --tail 500 sessionmvc-run-${env.BUILD_NUMBER} || echo 'Could not fetch logs or container exited.'"
 
                     echo "Stopping and removing the SessionMVC container..."
