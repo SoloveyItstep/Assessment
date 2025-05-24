@@ -14,24 +14,23 @@ pipeline {
         }
       }
       steps {
-        // Клонування репозиторію
-        git url: 'https://github.com/SoloveyItstep/Assessment.git', branch: 'master'
+        // 1) Запускаємо тести з трекером TRX
+    sh '''
+      dotnet test Assessment.sln --no-build --configuration Release \
+        --logger "trx;LogFileName=testresults.trx" --results-directory ./TestResults
+    '''
 
-        // Відновлення залежностей
-        sh 'dotnet restore Assessment.sln'
+    // 2) Встановлюємо trx2junit (якщо ще не встановлено) і конвертуємо .trx → .xml
+    sh '''
+      export PATH="$PATH:$HOME/.dotnet/tools"
+      if ! command -v trx2junit >/dev/null 2>&1; then
+        dotnet tool install --global trx2junit
+      fi
+      trx2junit ./TestResults/testresults.trx --output ./TestResults/testresults.xml
+    '''
 
-        // Побудова проєкту
-        sh 'dotnet build Assessment.sln --configuration Release --no-restore'
-
-        // Запуск тестів і конвертація результатів
-        sh '''
-          dotnet test Assessment.sln --no-build --configuration Release --logger:junit "trx;LogFileName=testresults.trx" --results-directory ./TestResults
-          export PATH="$PATH:$HOME/.dotnet/tools"
-          if ! command -v trx2junit >/dev/null 2>&1; then
-            dotnet tool install --global trx2junit
-          fi
-          trx2junit ./TestResults/testresults.trx
-        '''
+        // 3) За бажанням подивитися результат у логах
+        sh 'cat ./TestResults/testresults.xml || true'
 
         // Публікація звіту
         script {
