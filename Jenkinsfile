@@ -50,13 +50,23 @@ pipeline {
         stage('Start Dependencies') {
             steps {
                 echo "Starting Docker Compose dependencies using plugin..."
-                // Використовуємо крок плагіна dockerCompose для 'up'
-                // Зверніть увагу: dockerCompose.up() або dc.up() можуть бути доступні залежно від версії плагіна.
-                // Перевірте Snippet Generator в Jenkins для точного синтаксису.
-                dockerCompose.up(
-                    file: 'docker-compose.yml', // Шлях до вашого docker-compose.yml
-                    detached: true,             // Еквівалент -d
-                    removeOrphans: true         // Гарна практика для очищення
+                // Використовуємо синтаксис плагіна для Declarative Pipeline
+                // Зверніть увагу: назва кроку, як правило, просто 'dockerCompose' або 'dockerComposeUp'
+                // або 'dockerComposeBuild' залежно від того, як його зареєстровано.
+                // Я використовую загальну назву 'dockerCompose' тут.
+                // Якщо не спрацює, перевірте Snippet Generator.
+                dockerCompose(
+                    // Обов'язково вказуємо команду. Для 'up' це зазвичай неявне, але краще вказати.
+                    // Це може бути 'up', 'build', 'pull', 'down'
+                    command: 'up',
+                    // Шлях до файлу docker-compose.yml.
+                    // Якщо ваш файл у корені, можна залишити порожнім, або вказати 'docker-compose.yml'.
+                    // Зазвичай параметр називається 'file' або 'yamlFile'
+                    file: 'docker-compose.yml',
+                    // Додаткові опції командного рядка
+                    // Ви можете додати --detach або інші опції тут.
+                    // Плагін може мати вбудовані параметри, такі як 'detached'
+                    options: '--detach'
                 )
             }
         }
@@ -64,8 +74,6 @@ pipeline {
         stage('Run App Container') {
             steps {
                 echo "Running application container..."
-                // Цей етап залишаємо, оскільки це запуск вашого конкретного додатка,
-                // який ви збирали в Docker Build stage.
                 sh "docker run -d -p 8081:5000 --name sessionmvc_container $DOCKER_IMAGE"
             }
         }
@@ -77,10 +85,12 @@ pipeline {
             sh 'docker stop sessionmvc_container || true'
             sh 'docker rm sessionmvc_container || true'
 
-            // Використовуємо крок плагіна dockerCompose для 'down'
-            dockerCompose.down(
+            // Використовуємо синтаксис плагіна для Declarative Pipeline для 'down'
+            dockerCompose(
+                command: 'down',
                 file: 'docker-compose.yml',
-                removeVolumes: true // Рекомендується для повного очищення
+                // Опції для 'down', наприклад, --volumes
+                options: '--volumes'
             )
         }
     }
