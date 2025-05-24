@@ -1,6 +1,6 @@
 ﻿using Microsoft.Extensions.Diagnostics.HealthChecks;
 
-namespace SessionMVC.Middleware;
+namespace Session.Services.Middleware;
 
 /// <summary>
 /// The healthckeck sample
@@ -10,8 +10,6 @@ public class HealthcheckSample : IHealthCheck
     public Task<HealthCheckResult> CheckHealthAsync(HealthCheckContext context, CancellationToken cancellationToken = default)
     {
         var isHealthy = true;
-
-        // ...
 
         if (isHealthy)
         {
