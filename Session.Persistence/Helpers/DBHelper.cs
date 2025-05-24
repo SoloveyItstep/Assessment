@@ -20,7 +20,6 @@ public static class DBHelper
                 "Hot", "Sweltering", "Scorching"
             };
             
-            int i = 0;
             foreach (var summary in summaries)
             {
                 context.Summarys.Add(new SummarySql(summary));

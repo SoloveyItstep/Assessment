@@ -1,4 +1,4 @@
-**/.classpath
+﻿**/.classpath
 **/.dockerignore
 **/.env
 **/.git
@@ -14,17 +14,25 @@
 **/azds.yaml
 **/bin
 **/charts
+
+# Ігноруємо файли, що починаються з docker-compose (включно з .yml і .override.yml)
 **/docker-compose*
 **/Dockerfile*
 **/node_modules
+
+# Але залишаємо docker-compose.dcproj у контексті
+!docker-compose.dcproj
+
 **/npm-debug.log
 **/obj
 **/secrets.dev.yaml
 **/values.dev.yaml
 LICENSE
 README.md
+
+# Не ігнорувати деякі файли .git, якщо вони потрібні для визначення версії тощо (зазвичай не потрібно для простої збірки)
 !**/.gitignore
-!.git/HEAD
-!.git/config
-!.git/packed-refs
-!.git/refs/heads/**
+# !.git/HEAD
+# !.git/config
+# !.git/packed-refs
+# !.git/refs/heads/**

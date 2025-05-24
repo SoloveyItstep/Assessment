@@ -1,44 +1,73 @@
 image: mcr.microsoft.com/dotnet/sdk:9.0
 
 stages:
-  - build
-  - test
-  # - code_style # Додамо пізніше, якщо потрібно
+  - build_and_artifact_test
 
-variables:
-  # Шляхи до файлів проектів відносно кореня репозиторію
-  SOLUTION_FILE: "Assessment.sln"
-  SESSION_MVC_PROJECT_PATH: "sessionMVC/sessionMVC.csproj" # Шлях до основного проекту
-  TEST_PROJECT_PATH: "Session.UnitTests/Session.UnitTests.csproj" # Шлях до тестового проекту
-
-before_script:
-  - echo "Using .NET SDK $(dotnet --version)"
-  - dotnet --info # Покаже детальну інформацію про SDK
-
-build_solution:
-  stage: build
+simple_artifact_job:
+  stage: build_and_artifact_test
+  tags: # Переконайтеся, що ці теги відповідають тегам Runner'а
+    - docker
+    # - dotnet 
   script:
-    - echo "Restoring NuGet packages for solution ${SOLUTION_FILE}..."
-    - dotnet restore "${SOLUTION_FILE}"
-    - echo "Building solution ${SOLUTION_FILE} in Release configuration..."
-    - dotnet build "${SOLUTION_FILE}" --configuration Release --no-restore
+    - echo "GitLab CI/CD Test - Creating a simple artifact"
+    - echo "This is a test artifact content." > test_artifact.txt
+    - echo "File created:"
+    - ls -l test_artifact.txt
   artifacts:
     paths:
-      # Зберігаємо артефакти збірки, якщо вони потрібні для наступних етапів або для завантаження
-      # Наприклад, для sessionMVC:
-      - sessionMVC/bin/Release/
-      - sessionMVC/obj/Release/ # Можливо, не потрібно для obj, але може бути корисним
+      - test_artifact.txt
     expire_in: 1 hour
+    when: on_success # Завантажувати артефакти тільки при успішному виконанні завдання
 
-run_tests:
-  stage: test
-  needs: [build_solution] # Запускати тільки після успішної збірки
-  script:
-    - echo "Running tests for ${TEST_PROJECT_PATH}..."
-    # --no-build, оскільки ми вже зібрали все на етапі build_solution
-    - dotnet test "${TEST_PROJECT_PATH}" --configuration Release --no-build --logger "trx;LogFileName=test_results.trx"
-  artifacts:
-    when: always # Збирати звіти про тести завжди
-    reports:
-      junit: "${TEST_PROJECT_PATH}/TestResults/test_results.trx" # Шлях відносно кореня проекту
-      # GitLab автоматично конвертує TRX у формат JUnit для відображення в UI
+
+# image: mcr.microsoft.com/dotnet/sdk:9.0
+
+# variables:
+#   GIT_STRATEGY: clone
+#   GIT_TRACE: "true"
+#   GIT_CURL_VERBOSE: "true"
+#   SOLUTION_FILE: "Assessment.sln"
+#   # Використовуємо змінні для директорій проектів для більшої гнучкості
+#   SESSION_MVC_DIR: "SessionMVC" # Назва директорії вашого основного веб-проекту
+#   TEST_PROJECT_DIR: "Session.UnitTests" # Назва директорії вашого тестового проекту
+#   # Повний шлях до .csproj файлу тестового проекту
+#   TEST_PROJECT_CSPROJ_PATH: "${TEST_PROJECT_DIR}/Session.UnitTests.csproj"
+
+# stages:
+#   - build
+#   - test
+
+# before_script:
+#   - echo "Using .NET SDK $(dotnet --version)"
+#   - dotnet --info
+#   - echo "Attempting to clone from $CI_REPOSITORY_URL"
+
+# build_solution:
+#   stage: build
+#   script:
+#     - echo "Restoring NuGet packages for solution ${SOLUTION_FILE}..."
+#     - dotnet restore "${SOLUTION_FILE}"
+#     - echo "Building solution ${SOLUTION_FILE} in Release configuration..."
+#     - dotnet build "${SOLUTION_FILE}" --configuration Release --no-restore
+#     # Якщо ви хочете перевірити вміст директорії після білду, робіть це тут:
+#     - echo "Checking artifacts path after build:"
+#     - ls -la "${SESSION_MVC_DIR}/bin/Release/net9.0/"
+#   artifacts:
+#     paths:
+#       # Правильний шлях до артефактів, який раніше знаходив 345 файлів
+#       - "${SESSION_MVC_DIR}/bin/Release/net9.0/"
+#     expire_in: 1 hour
+
+# run_tests:
+#   stage: test
+#   needs: [build_solution]
+#   script:
+#     - echo "Running tests for ${TEST_PROJECT_CSPROJ_PATH}..."
+#     # Команда dotnet test створить папку TestResults всередині директорії TEST_PROJECT_DIR
+#     - dotnet test "${TEST_PROJECT_CSPROJ_PATH}" --configuration Release --no-build --logger "trx;LogFileName=test_results.trx"
+#   artifacts:
+#     when: always
+#     reports:
+#       # Правильний шлях до TRX файлу для JUnit звіту.
+#       # Він має бути відносним до кореня проекту.
+#       junit: "${TEST_PROJECT_DIR}/TestResults/test_results.trx"

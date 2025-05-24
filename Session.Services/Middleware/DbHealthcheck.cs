@@ -1,13 +1,12 @@
 ﻿using log4net;
 using Microsoft.Extensions.DependencyInjection;
-using MongoDB.Bson;
 using MongoDB.Driver;
 using Session.Domain.Models.Mongo;
 using Session.Persistence.Contexts;
 using Session.Persistence.Helpers;
 
 namespace Session.Services.Middleware;
-internal class DbHealthcheck
+public static class DbHealthcheck
 {
     private static bool SqlDbChecked = false;
     private static bool MongoDbChecked = false;
