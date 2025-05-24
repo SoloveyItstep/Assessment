@@ -6,6 +6,8 @@ pipeline {
         APP_IMAGE_NAME = 'sessionmvc' // Це ім'я використовується у вашому docker-compose.yml
         // Версія .NET SDK, яку ви використовуєте
         DOTNET_SDK_VERSION = '9.0' // Ви вказали 9.0
+        // Email адреса для сповіщень про помилки
+        ERROR_NOTIFICATION_EMAIL = 'your-email@example.com' // ЗАМІНІТЬ НА ВАШУ АДРЕСУ
     }
 
     stages {
@@ -34,8 +36,8 @@ pipeline {
             steps {
                 echo "Current directory listing inside the container:"
                 sh 'ls -la'
-                echo "Building the ASP.NET Core application (Solution: Assessment.sln)..." // Змінено тут
-                sh 'dotnet build Assessment.sln --configuration Release'                   // І тут
+                echo "Building the ASP.NET Core application (Solution: Assessment.sln)..."
+                sh 'dotnet build Assessment.sln --configuration Release'
             }
         }
 
@@ -52,37 +54,29 @@ pipeline {
         }
 
         stage('Build Docker Image') {
-            // Цей етап виконується на агенті Jenkins, який має доступ до Docker CLI
-            // та Docker-демону (якщо Jenkins в Docker, сокет має бути прокинутий)
             steps {
                 echo "Building Docker image ${env.IMAGE_TAG_LATEST} and ${env.IMAGE_TAG_COMMIT}..."
-                // Dockerfile знаходиться в корені проєкту (context: .), тому просто '.'
-                // Тегуємо образ одразу двома тегами: 'latest' та з хешем коміту
                 sh "docker build -t ${env.IMAGE_TAG_LATEST} -t ${env.IMAGE_TAG_COMMIT} ."
             }
         }
 
         stage('Push Docker Image (Skipped)') {
-            // Цей етап пропускається, оскільки ви не використовуєте Docker Hub для завантаження
             steps {
                 echo "Skipping Docker Image Push as per configuration (not using Docker Hub for this app)."
             }
         }
 
         stage('Deploy with Docker Compose') {
-            // Цей етап також потребує доступу до Docker CLI та docker-compose
+            agent {
+                docker {
+                    image 'docker/compose:1.29.2'
+                    // args '-v /var/run/docker.sock:/var/run/docker.sock' // Розкоментуйте, якщо потрібно
+                }
+            }
             steps {
                 echo 'Deploying application using Docker Compose...'
-                // docker-compose.yml знаходиться в корені проєкту.
-                // Команда `docker-compose up -d --build <service_name>` перебудує образ для <service_name>
-                // (використовуючи локально зібраний образ, якщо тег співпадає з тим, що вказано в image: у docker-compose,
-                // або якщо docker-compose бачить, що build context змінився і його Dockerfile)
-                // та перезапустить його.
-                // У вашому docker-compose.yml для sessionmvc вказано `image: sessionmvc` та `build: .`,
-                // тому `docker-compose up -d --build sessionmvc` повинен використовувати образ,
-                // який ми зібрали на попередньому етапі і затегували як 'sessionmvc:latest'.
+                sh 'docker-compose --version'
                 sh "docker-compose up -d --build sessionmvc"
-
                 echo "To check logs after deploy, run: docker-compose logs --tail=50 sessionmvc"
             }
         }
@@ -91,15 +85,22 @@ pipeline {
     post {
         always {
             echo 'Pipeline finished.'
-            // Очищення робочої області Jenkins (видаляє файли з checkout)
             cleanWs()
         }
         success {
             echo 'Pipeline succeeded!'
+            // Приклад сповіщення про успіх (якщо потрібно)
+            // mail to: "${env.ERROR_NOTIFICATION_EMAIL}",
+            //      subject: "SUCCESS: Pipeline ${env.JOB_NAME} - Build #${env.BUILD_NUMBER}",
+            //      body: "Pipeline ${env.JOB_NAME} - Build #${env.BUILD_NUMBER} completed successfully. URL: ${env.BUILD_URL}"
         }
         failure {
             echo 'Pipeline failed!'
-            // Тут можна додати сповіщення про помилку
+            // Сповіщення про помилку електронною поштою
+            mail to: "${env.ERROR_NOTIFICATION_EMAIL}",
+                 subject: "FAILURE: Pipeline ${env.JOB_NAME} - Build #${env.BUILD_NUMBER}",
+                 body: """Pipeline ${env.JOB_NAME} - Build #${env.BUILD_NUMBER} failed.
+Check console output for more details: ${env.BUILD_URL}console"""
         }
     }
 }
