@@ -1,13 +1,13 @@
 ﻿using log4net;
 using log4net.Config;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using MongoDB.Driver;
 using Session.Application.Repositories;
 using Session.Persistence.Contexts;
 using Session.Persistence.Repositories;
 using Session.Services.Mapping;
-using Session.Services.Middleware;
 using Session.Services.Services;
 using Session.Services.Services.Interfaces;
 using SessionMVC.Middleware;
@@ -19,7 +19,40 @@ public static class ServiceCollectionExtension
     public static IServiceCollection AddSessionServices(this IServiceCollection services, string connectionString, string mongoConnectionString)
     {
         //var MongoDbUri = Environment.GetEnvironmentVariable("MongoConnectionString");
-        services.AddSingleton(new MongoClient(mongoConnectionString).GetDatabase("Assessment"));
+        services.AddSingleton<IMongoClient>(sp =>
+        {
+            var configuration = sp.GetRequiredService<IConfiguration>();
+            var connectionString = configuration.GetConnectionString("MongoConnectionString"); // Або configuration["MongoConnectionString"]
+            if (string.IsNullOrEmpty(connectionString))
+            {
+                // Логування або викидання виключення, якщо рядок не знайдено
+                throw new InvalidOperationException("MongoConnectionString not found in configuration.");
+            }
+            Console.WriteLine($"Using MongoDB connection string: {connectionString}"); // Для дебагу
+            return new MongoClient(connectionString);
+        });
+
+        // Або якщо ви отримуєте IMongoDatabase напряму:
+        services.AddSingleton<IMongoDatabase>(sp =>
+        {
+            var configuration = sp.GetRequiredService<IConfiguration>();
+            var connectionString = configuration.GetConnectionString("MongoConnectionString"); // Або configuration["MongoConnectionString"]
+            if (string.IsNullOrEmpty(connectionString))
+            {
+                throw new InvalidOperationException("MongoConnectionString not found in configuration.");
+            }
+            Console.WriteLine($"DEBUG: Using MongoDB connection string from config: {connectionString}");
+            var client = new MongoClient(connectionString);
+            var databaseName = MongoUrl.Create(connectionString).DatabaseName; // Отримати ім'я БД з рядка
+            if (string.IsNullOrEmpty(databaseName))
+            {
+                // Якщо ім'я БД не вказано в рядку, можливо, його треба додати або взяти з іншого місця конфігурації
+                // Для вашого рядка "mongodb://root:example@mongo:27017/Assessment?authSource=admin&directConnection=true"
+                // databaseName буде "Assessment"
+                throw new InvalidOperationException("Database name not found in MongoConnectionString.");
+            }
+            return client.GetDatabase(databaseName);
+        });
 
         services.AddDbContext<AssessmentDbContext>(options => {
             options.UseSqlServer(connectionString);
@@ -54,9 +87,4 @@ public static class ServiceCollectionExtension
 
         return services;
     }
-
-    //public static async Task<IServiceCollection> ValidateDatabases(this WebApplication services)
-    //{
-        
-    //}
 }
