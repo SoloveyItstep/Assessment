@@ -1,58 +1,76 @@
+// Визначаємо допоміжні функції Groovy тут, ПОЗА блоком pipeline {}
+def determineDeployEnvironment(String branchName) {
+    if (branchName == null || branchName.isEmpty() || branchName == "null") {
+        echo "WARNING: Branch name is null or empty in determineDeployEnvironment. Defaulting to FeatureBranch."
+        return 'FeatureBranch' 
+    }
+    if (branchName == 'master' || branchName == 'main') {
+        return 'Production'
+    } else if (branchName == 'develop') {
+        return 'Development'
+    } else {
+        return 'FeatureBranch'
+    }
+}
+
+def determineAspNetCoreEnvironment(String branchName) {
+    if (branchName == null || branchName.isEmpty() || branchName == "null") {
+        echo "WARNING: Branch name is null or empty in determineAspNetCoreEnvironment. Defaulting to Development."
+        return 'Development'
+    }
+    if (branchName == 'master' || branchName == 'main') {
+        return 'Production'
+    } else if (branchName == 'develop') {
+        return 'Development'
+    } else {
+        return 'Development'
+    }
+}
+
 pipeline {
-    agent any
+    agent any 
 
     environment {
         APP_IMAGE_NAME = 'sessionmvc'
         DOTNET_SDK_VERSION = '9.0'
-        ERROR_NOTIFICATION_EMAIL = 'solovey.itstep@gmail.com' // ЗАМІНІТЬ НА ВАШУ АДРЕСУ
+        ERROR_NOTIFICATION_EMAIL = 'solovey.itstep@gmial.com' // Ваша пошта
 
-        // Ці змінні будуть визначені на етапі Initialize Environment
-        GIT_BRANCH_NAME = '' // Для зберігання імені поточної гілки
-        DEPLOY_ENVIRONMENT = '' 
-        ASPNETCORE_ENVIRONMENT_FOR_APP = '' // Це значення буде передано в контейнер
+        // Визначаємо базові змінні середовища
+        GIT_BRANCH_NAME              = "${env.BRANCH_NAME}"
+        DEPLOY_ENVIRONMENT           = determineDeployEnvironment(env.BRANCH_NAME)
+        ASPNETCORE_ENVIRONMENT_FOR_APP = determineAspNetCoreEnvironment(env.BRANCH_NAME)
+        
+        // Теги будуть повністю визначені та присвоєні env. в script блоці нижче
     }
 
     stages {
-        stage('Initialize Environment and Checkout') {
+        stage('Initialize and Display Environment') {
             steps {
-                // Спочатку робимо checkout, щоб визначити гілку
-                checkout scm
                 script {
-                    env.GIT_BRANCH_NAME = शांतिscm.branches[0].name // Отримуємо ім'я поточної гілки
-                    echo "Current Git branch: ${env.GIT_BRANCH_NAME}"
-
-                    // Визначаємо середовище на основі гілки Git
-                    if (env.GIT_BRANCH_NAME == 'master' || env.GIT_BRANCH_NAME == 'main') {
-                        env.DEPLOY_ENVIRONMENT = 'Production'
-                        env.ASPNETCORE_ENVIRONMENT_FOR_APP = 'Production'
-                    } else if (env.GIT_BRANCH_NAME == 'develop') {
-                        env.DEPLOY_ENVIRONMENT = 'Development'
-                        env.ASPNETCORE_ENVIRONMENT_FOR_APP = 'Development'
-                    } else {
-                        // Для інших гілок можна встановити Development за замовчуванням
-                        // або фейлити пайплайн, якщо вони не призначені для деплою
-                        env.DEPLOY_ENVIRONMENT = 'Development' // Або 'FeatureBranch' тощо.
-                        env.ASPNETCORE_ENVIRONMENT_FOR_APP = 'Development'
-                        echo "Branch '${env.GIT_BRANCH_NAME}' is not 'master' or 'develop'. Defaulting to Development environment for ASP.NET Core."
-                        // Якщо для feature-гілок не потрібен повний деплой, тут можна змінити логіку
+                    echo "Current Git branch (from env.BRANCH_NAME via env.GIT_BRANCH_NAME): ${env.GIT_BRANCH_NAME}"
+                    if (env.GIT_BRANCH_NAME == null || env.GIT_BRANCH_NAME.isEmpty() || env.GIT_BRANCH_NAME == "null") {
+                        error "FATAL: Could not determine current Git branch. env.BRANCH_NAME was '${env.BRANCH_NAME}'"
                     }
+                    
                     echo "Deployment Environment: ${env.DEPLOY_ENVIRONMENT}"
                     echo "ASPNETCORE_ENVIRONMENT for application: ${env.ASPNETCORE_ENVIRONMENT_FOR_APP}"
 
-                    // Визначаємо теги для Docker-образу
                     def shortCommit = sh(script: 'git rev-parse --short HEAD', returnStdout: true).trim()
-                    env.IMAGE_TAG_LATEST = "${env.APP_IMAGE_NAME}:latest" // Завжди збираємо latest
+                    // Присвоюємо значення глобальним змінним env, щоб вони були доступні на наступних етапах
+                    env.IMAGE_TAG_LATEST = "${env.APP_IMAGE_NAME}:latest"
                     env.IMAGE_TAG_COMMIT = "${env.APP_IMAGE_NAME}:${shortCommit}"
-                    env.IMAGE_TAG_ENV_SPECIFIC = "${env.APP_IMAGE_NAME}:${env.DEPLOY_ENVIRONMENT.toLowerCase()}-${shortCommit}"
                     
-                    echo "Image tags will be: ${env.IMAGE_TAG_LATEST}, ${env.IMAGE_TAG_COMMIT}, ${env.IMAGE_TAG_ENV_SPECIFIC}"
+                    if (env.DEPLOY_ENVIRONMENT != null && env.DEPLOY_ENVIRONMENT != "null") {
+                        env.IMAGE_TAG_ENV_SPECIFIC = "${env.APP_IMAGE_NAME}:${env.DEPLOY_ENVIRONMENT.toLowerCase()}-${shortCommit}"
+                    } else {
+                        env.IMAGE_TAG_ENV_SPECIFIC = "${env.APP_IMAGE_NAME}:unknownenv-${shortCommit}" 
+                        echo "WARNING: DEPLOY_ENVIRONMENT was null or 'null' when creating IMAGE_TAG_ENV_SPECIFIC."
+                    }
+                    
+                    echo "Image tags set to: ${env.IMAGE_TAG_LATEST}, ${env.IMAGE_TAG_COMMIT}, ${env.IMAGE_TAG_ENV_SPECIFIC}"
                 }
             }
         }
-
-        // Примітка: checkout на початку кожного docker agent блоку (як було раніше) не потрібен,
-        // якщо код вже завантажено на першому етапі і робочий простір передається.
-        // Jenkins монтує робочий простір в Docker-контейнери.
 
         stage('Build Application (.NET)') {
             agent {
@@ -62,8 +80,6 @@ pipeline {
             }
             steps {
                 echo "Building the ASP.NET Core application (Solution: Assessment.sln)..."
-                // ASPNETCORE_ENVIRONMENT_FOR_APP тут не використовується для `dotnet build`, 
-                // оскільки `appsettings.*.json` файли копіюються в Dockerfile на етапі publish.
                 sh 'dotnet build Assessment.sln --configuration Release'
             }
         }
@@ -82,23 +98,14 @@ pipeline {
 
         stage('Build Docker Image') {
             steps {
-                echo "Building Docker image with tags: ${env.IMAGE_TAG_LATEST}, ${env.IMAGE_TAG_COMMIT}, ${env.IMAGE_TAG_ENV_SPECIFIC}"
-                // Під час `docker build` ASPNETCORE_ENVIRONMENT всередині Dockerfile (якщо він там встановлений)
-                // визначить, який appsettings буде "активним" під час PUBLISH.
-                // Ваш Dockerfile копіює всі файли, а потім ENV ASPNETCORE_HTTP_PORTS=5000.
-                // ASPNETCORE_ENVIRONMENT для publish береться з середовища, де виконується `dotnet publish`.
-                // Щоб це було більш керовано, можна передати ASPNETCORE_ENVIRONMENT_FOR_APP як build-arg:
-                // sh "docker build --build-arg APP_ENV=${env.ASPNETCORE_ENVIRONMENT_FOR_APP} -t ${env.IMAGE_TAG_LATEST} -t ${env.IMAGE_TAG_COMMIT} -t ${env.IMAGE_TAG_ENV_SPECIFIC} ."
-                // І в Dockerfile:
-                // ARG APP_ENV=Production (дефолтне значення)
-                // ENV ASPNETCORE_ENVIRONMENT=$APP_ENV
-                // RUN dotnet publish ... (ASPNETCORE_ENVIRONMENT буде використано)
-                // АЛЕ, оскільки ваш Dockerfile копіює всі appsettings.*.json, і ми будемо встановлювати 
-                // ASPNETCORE_ENVIRONMENT під час `docker-compose up`, то передавати його як build-arg не є критично необхідним
-                // для вибору правильного `appsettings` під час виконання. Це більше вплине, якщо `dotnet publish`
-                // робить трансформації конфігів на основі ASPNETCORE_ENVIRONMENT.
-                // Для простоти поки залишимо як є.
-                sh "docker build -t ${env.IMAGE_TAG_LATEST} -t ${env.IMAGE_TAG_COMMIT} -t ${env.IMAGE_TAG_ENV_SPECIFIC} ."
+                script {
+                    echo "Building Docker image with tags: ${env.IMAGE_TAG_LATEST}, ${env.IMAGE_TAG_COMMIT}, ${env.IMAGE_TAG_ENV_SPECIFIC}"
+                    // Переконуємося, що змінні не null перед використанням
+                    def tagLatest = env.IMAGE_TAG_LATEST ?: "${env.APP_IMAGE_NAME}:latest-fallback"
+                    def tagCommit = env.IMAGE_TAG_COMMIT ?: "${env.APP_IMAGE_NAME}:commit-fallback"
+                    def tagEnvSpecific = env.IMAGE_TAG_ENV_SPECIFIC ?: "${env.APP_IMAGE_NAME}:env-fallback"
+                    sh "docker build -t \"${tagLatest}\" -t \"${tagCommit}\" -t \"${tagEnvSpecific}\" ."
+                }
             }
         }
 
@@ -109,89 +116,46 @@ pipeline {
         }
 
         stage('Deploy to Environment') {
+            when {
+                expression { env.DEPLOY_ENVIRONMENT == 'Development' || env.DEPLOY_ENVIRONMENT == 'Production' }
+            }
             agent {
                 docker {
                     image 'docker/compose:1.29.2'
-                    // args '-v /var/run/docker.sock:/var/run/docker.sock' // Розкоментуйте, якщо потрібно
                 }
             }
             steps {
                 script {
                     echo "Preparing to deploy to ${env.DEPLOY_ENVIRONMENT} environment using ASPNETCORE_ENVIRONMENT=${env.ASPNETCORE_ENVIRONMENT_FOR_APP}"
                     
-                    def composeFiles = "-f docker-compose.yml"
-                    // Перевіряємо, чи існує spezifischer override-файл для поточного середовища
-                    def overrideFileName = "docker-compose.${env.DEPLOY_ENVIRONMENT.toLowerCase()}.yml"
-                    if (fileExists(overrideFileName)) {
+                    // Базовий файл завжди docker-compose.yml
+                    def composeFiles = "-f docker-compose.yml" 
+                    // Визначаємо ім'я override-файлу на основі середовища
+                    def overrideFileName = (env.DEPLOY_ENVIRONMENT != null && env.DEPLOY_ENVIRONMENT != "null") ? "docker-compose.${env.DEPLOY_ENVIRONMENT.toLowerCase()}.yml" : null
+                    
+                    if (overrideFileName != null && fileExists(overrideFileName)) {
                         composeFiles += " -f ${overrideFileName}"
                         echo "Using override file: ${overrideFileName}"
                     } else {
-                        echo "No specific override file found for ${env.DEPLOY_ENVIRONMENT} (${overrideFileName}), using default docker-compose.yml."
+                        // Логіка для випадку, коли override-файл не знайдено
+                        if (env.DEPLOY_ENVIRONMENT == 'Production') {
+                             // Для Production override-файл бажаний, але якщо його немає, продовжимо з попередженням
+                            echo "WARNING: Production override file ('${overrideFileName ?: 'docker-compose.production.yml'}') not found! Using only default docker-compose.yml for Production."
+                        } else if (env.DEPLOY_ENVIRONMENT == 'Development') {
+                            echo "INFO: Development override file ('${overrideFileName ?: 'docker-compose.development.yml'}') not found. Using only default docker-compose.yml for Development."
+                        } else if (env.DEPLOY_ENVIRONMENT != "null" && env.DEPLOY_ENVIRONMENT != null) { // Для інших середовищ (напр. FeatureBranch)
+                            echo "INFO: No specific override file for ${env.DEPLOY_ENVIRONMENT} ('${overrideFileName}'). Using only default docker-compose.yml."
+                        } else { // Якщо DEPLOY_ENVIRONMENT не визначено (не повинно трапитися)
+                            echo "WARNING: DEPLOY_ENVIRONMENT is null or invalid, using only default docker-compose.yml."
+                        }
                     }
 
-                    echo "Stopping and removing existing services (if any)..."
+                    echo "Stopping and removing existing services (if any) using compose files: ${composeFiles}"
                     sh script: "docker-compose ${composeFiles} down --remove-orphans", returnStatus: true
                     
                     echo "Deploying application using Docker Compose..."
                     sh "docker-compose --version"
-
-                    // Встановлюємо ASPNETCORE_ENVIRONMENT для команди docker-compose up.
-                    // Це значення буде передано в контейнер sessionmvc, ЯКЩО в docker-compose файлі (або override)
-                    // для сервісу sessionmvc в секції environment є запис типу:
-                    // - ASPNETCORE_ENVIRONMENT=${ASPNETCORE_ENVIRONMENT}
-                    // АБО
-                    // - ASPNETCORE_ENVIRONMENT 
-                    // (останнє означає, що змінна з таким ім'ям береться з оточення, де запущено docker-compose)
-                    // Оскільки ми хочемо, щоб саме env.ASPNETCORE_ENVIRONMENT_FOR_APP з Jenkins керував цим,
-                    // потрібно, щоб docker-compose.yml (або відповідний override) був налаштований на це.
                     
-                    // Припустимо, ваш docker-compose.yml (або docker-compose.development.yml / docker-compose.production.yml)
-                    // має такий запис для сервісу sessionmvc:
-                    // services:
-                    //   sessionmvc:
-                    //     environment:
-                    //       - ASPNETCORE_ENVIRONMENT=${ASPNETCORE_ENVIRONMENT_FROM_HOST:-Development}
-                    //       - ASPNETCORE_URLS=http://+:5000
-                    //       - MongoConnectionString=${MONGO_CONNECTION_STRING_FROM_HOST}
-                    //       - ConnectionStrings__AssessmentDbConnectionString=${SQL_CONNECTION_STRING_FROM_HOST}
-
-                    // Тоді ми можемо передати ці змінні так:
-                    def command = """
-                        ASPNETCORE_ENVIRONMENT_FROM_HOST='${env.ASPNETCORE_ENVIRONMENT_FOR_APP}' \\
-                        MONGO_CONNECTION_STRING_FROM_HOST='mongodb://root:example@mongo:27017/Assessment?authSource=admin&directConnection=true' \\
-                        SQL_CONNECTION_STRING_FROM_HOST='Server=db;Database=Assessment;User=sa;Password=Your_password123;Encrypt=False;TrustServerCertificate=True' \\
-                        docker-compose ${composeFiles} up -d --build sessionmvc
-                    """
-                    // Зверніть увагу на одинарні лапки навколо значень змінних, щоб уникнути проблем з спеціальними символами.
-                    // І на `\` для перенесення рядків у Groovy multi-line string.
-                    
-                    // Однак, якщо у вашому docker-compose.yml для sessionmvc вже жорстко прописані ці змінні,
-                    // наприклад, ASPNETCORE_ENVIRONMENT=Development, то для Production вам АБСОЛЮТНО ТОЧНО
-                    // потрібен override-файл (наприклад, docker-compose.production.yml), де буде
-                    // ASPNETCORE_ENVIRONMENT=Production. І тоді команда буде простішою:
-                    // sh "docker-compose ${composeFiles} up -d --build sessionmvc"
-                    // А env.ASPNETCORE_ENVIRONMENT_FOR_APP буде використовуватися тільки для логіки в Jenkins.
-                    
-                    // Давайте приймемо другий, простіший варіант:
-                    // 1. Ваш `docker-compose.yml` містить конфігурацію для Development (ASPNETCORE_ENVIRONMENT=Development).
-                    // 2. Ви створюєте `docker-compose.production.yml`, який перекриває ASPNETCORE_ENVIRONMENT на Production.
-                    // JenkinsFile просто вибирає, які файли використовувати.
-                    // `docker-compose.yml` (основний):
-                    //   services:
-                    //     sessionmvc:
-                    //       environment:
-                    //         - ASPNETCORE_ENVIRONMENT=Development
-                    //         - ASPNETCORE_URLS=http://+:5000
-                    //         - MongoConnectionString=mongodb://root:example@mongo:27017/Assessment?authSource=admin&directConnection=true
-                    //         - ConnectionStrings__AssessmentDbConnectionString=Server=db;Database=Assessment;User=sa;Password=Your_password123;Encrypt=False;TrustServerCertificate=True
-                    // `docker-compose.production.yml` (створіть цей файл):
-                    //   version: '3.8' # Або ваша версія
-                    //   services:
-                    //     sessionmvc:
-                    //       environment:
-                    //         ASPNETCORE_ENVIRONMENT: Production # Перекриваємо для Production
-                                         // Інші змінні, якщо вони відрізняються для Production, можна теж тут перекрити
-
                     echo "Executing: docker-compose ${composeFiles} up -d --build sessionmvc"
                     sh "docker-compose ${composeFiles} up -d --build sessionmvc"
                     
@@ -206,42 +170,43 @@ pipeline {
             }
             steps {
                 script {
-                    // Потрібно налаштувати credentials для push в Git
-                    // withCredentials([sshUserPrivateKey(credentialsId: 'your-git-ssh-credentials-id', keyFileVariable: 'GIT_SSH_KEY')]) {
-                        // sh 'git config --global user.email "jenkins@example.com"'
-                        // sh 'git config --global user.name "Jenkins CI"'
-                        
-                        // Використовуємо вже визначений env.IMAGE_TAG_COMMIT або env.GIT_BRANCH_NAME
-                        def tagName = "v${new Date().format('yyyyMMdd.HHmmss')}-${env.DEPLOY_ENVIRONMENT.toLowerCase()}"
-                        echo "Creating Git tag: ${tagName}"
-                        sh "git tag ${tagName}"
-                        echo "Attempting to push Git tag: ${tagName}"
-                        // sh "git push origin ${tagName}" // Розкоментуйте, коли налаштуєте credentials для push
-                        echo "NOTE: 'git push origin ${tagName}' is currently commented out. Configure credentials and uncomment for actual push."
-                    // }
+                    def tagName = (env.DEPLOY_ENVIRONMENT != null && env.DEPLOY_ENVIRONMENT != "null") ? "v${new Date().format('yyyyMMdd.HHmmss')}-${env.DEPLOY_ENVIRONMENT.toLowerCase()}" : "v${new Date().format('yyyyMMdd.HHmmss')}-unknownenv"
+                    echo "Creating Git tag: ${tagName}"
+                    sh "git tag ${tagName}"
+                    echo "Attempting to push Git tag: ${tagName}"
+                    // sh "GIT_SSH_COMMAND='ssh -i ${GIT_SSH_KEY} -o IdentitiesOnly=yes -o StrictHostKeyChecking=no' git push origin ${tagName}"
+                    echo "NOTE: 'git push origin ${tagName}' is currently commented out. Configure credentials and uncomment for actual push."
                 }
             }
         }
-    }
+    } // кінець stages
 
     post {
         always {
-            echo "Pipeline finished for branch ${env.GIT_BRANCH_NAME} and environment ${env.DEPLOY_ENVIRONMENT}."
-            // Очищення робочої області Jenkins
-            cleanWs()
+            script { 
+                def finalBranchName = env.GIT_BRANCH_NAME ?: "unknown_branch (was null)"
+                def finalDeployEnv = env.DEPLOY_ENVIRONMENT ?: "unknown_environment (was null)"
+                echo "Pipeline finished for branch ${finalBranchName} and environment ${finalDeployEnv}."
+            }
+            cleanWs() 
         }
         success {
             echo 'Pipeline succeeded!'
-            // mail to: "${env.ERROR_NOTIFICATION_EMAIL}",
-            //      subject: "SUCCESS: Pipeline ${env.JOB_NAME} - Build #${env.BUILD_NUMBER} [${env.DEPLOY_ENVIRONMENT}]",
-            //      body: "Pipeline ${env.JOB_NAME} - Build #${env.BUILD_NUMBER} for ${env.DEPLOY_ENVIRONMENT} on branch ${env.GIT_BRANCH_NAME} completed successfully. URL: ${env.BUILD_URL}"
         }
         failure {
-            echo 'Pipeline failed!'
-            mail to: "${env.ERROR_NOTIFICATION_EMAIL}",
-                 subject: "FAILURE: Pipeline ${env.JOB_NAME} - Build #${env.BUILD_NUMBER} [${env.DEPLOY_ENVIRONMENT}]",
-                 body: """Pipeline ${env.JOB_NAME} - Build #${env.BUILD_NUMBER} for environment ${env.DEPLOY_ENVIRONMENT} on branch ${env.GIT_BRANCH_NAME} failed.
+            script { 
+                def finalBranchName = env.GIT_BRANCH_NAME ?: "unknown_branch (was null)"
+                def finalDeployEnv = env.DEPLOY_ENVIRONMENT ?: "unknown_environment (was null)"
+                echo 'Pipeline failed!'
+                if (env.ERROR_NOTIFICATION_EMAIL && env.ERROR_NOTIFICATION_EMAIL != 'your-email@example.com') { // Перевіряємо, чи email змінено з дефолтного
+                    mail to: "${env.ERROR_NOTIFICATION_EMAIL}",
+                         subject: "FAILURE: Pipeline ${env.JOB_NAME} - Build #${env.BUILD_NUMBER} [${finalDeployEnv}]",
+                         body: """Pipeline ${env.JOB_NAME} - Build #${env.BUILD_NUMBER} for environment ${finalDeployEnv} on branch ${finalBranchName} failed.
 Check console output for more details: ${env.BUILD_URL}console"""
+                } else {
+                    echo "Email notification skipped: ERROR_NOTIFICATION_EMAIL is default or not configured."
+                }
+            }
         }
     }
 }
