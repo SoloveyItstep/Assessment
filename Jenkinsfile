@@ -3,8 +3,8 @@ pipeline {
 
     environment {
         DOCKER_IMAGE = 'sessionmvc-app:latest'
-        DOCKER_BASE_IMAGE = 'alpine/git' // Цей образ вже має git та базові утиліти
-        DOCKER_COMPOSE_VERSION = '2.27.0' // Конкретна версія docker compose, яку ми завантажимо
+        DOCKER_BASE_IMAGE = 'alpine/git' // Цей образ використовується для виконання команд Docker Compose
+        DOCKER_COMPOSE_VERSION = '2.27.0' // Версія Docker Compose, яку ми завантажимо
     }
 
     stages {
@@ -18,7 +18,7 @@ pipeline {
             agent {
                 docker {
                     image 'mcr.microsoft.com/dotnet/sdk:9.0'
-                    args '-v /var/run/docker.sock:/var/run/docker.sock'
+                    args '-v /var/run/docker.sock:/var/run/docker.sock' // Для доступу до Docker Daemon з контейнера SDK
                 }
             }
             steps {
@@ -45,14 +45,17 @@ pipeline {
 
         stage('Docker Build') {
             steps {
+                // Збираємо образ вашого додатка. Виконується на Jenkins-агенті (який має доступ до Docker).
                 sh 'docker build -t <span class="math-inline">DOCKER\_IMAGE \.'
 \}
 \}
 stage\('Start Dependencies'\) \{
+// Цей етап запускає docker\-compose\. Ми використовуємо спеціальний Docker\-образ,
+// який завантажить та виконає docker\-compose\.
 agent \{
 docker \{
-image "</span>{DOCKER_BASE_IMAGE}" // ТУТ БУЛА ПРОБЛЕМА, ПОВИНЕН БУТИ 'image'
-                    args '-v /var/run/docker.sock:/var/run/docker.sock' // Доступ до Docker Daemon
+image "</span>{DOCKER_BASE_IMAGE}"
+                    args '-v /var/run/docker.sock:/var/run/docker.sock' // Надаємо доступ до Docker Daemon хоста
                 }
             }
             steps {
@@ -62,46 +65,34 @@ image "</span>{DOCKER_BASE_IMAGE}" // ТУТ БУЛА ПРОБЛЕМА, ПОВИ
 sh 'ls \-la'
 echo "Installing Docker Compose v</span>{DOCKER_COMPOSE_VERSION}..."
                 sh '''
-                    # Встановлюємо curl та інші необхідні пакети
+                    # Встановлюємо curl, необхідний для завантаження docker-compose
                     apk add --no-cache curl
 
                     # Завантажуємо бінарник Docker Compose v2.x.x
+                    # <span class="math-inline">\(uname \-s\)\-</span>(uname -m) автоматично визначить операційну систему та архітектуру (наприклад, linux-x86_64)
                     curl -L "https://github.com/docker/compose/releases/download/v${DOCKER_COMPOSE_VERSION}/docker-compose-linux-<span class="math-inline">\(uname \-m\)" \\\\
 \-o /usr/local/bin/docker\-compose
-\# Робимо його виконуваним
+\# Робимо бінарний файл виконуваним
 chmod \+x /usr/local/bin/docker\-compose
-\# Перевіряємо версію \(для відладки\)
+\# Перевіряємо версію Docker Compose \(для відладки\)
 docker\-compose version
 echo "Starting Docker Compose services\.\.\."
-\# Запускаємо сервіси за допомогою docker\-compose \(старий синтаксис, але бінарник v2\)
+\# Запускаємо сервіси, визначені в docker\-compose\.yml, у фоновому режимі \(\-d\)
 docker\-compose up \-d
 '''
 \}
 \}
 stage\('Run App Container'\) \{
-// Запускаємо додаток SessionMVC\. Цей етап не обов'язково повинен бути на тому ж агентові,
-// що й docker\-compose, оскільки він запускає вже зібраний образ\.
-// Можна залишити 'agent any' або використовувати інший, відповідний для запуску додатків\.
-// Якщо ви хочете, щоб він запускався на тому ж alpine/git, тоді\:
+// Запускаємо контейнер вашого додатка\.
+// Ми можемо використовувати той самий агент, що й для docker\-compose, або будь\-який інший\.
 agent \{
 docker \{
-image "</span>{DOCKER_BASE_IMAGE}" // ТУТ БУЛА ПРОБЛЕМА, ПОВИНЕН БУТИ 'image'
+image "</span>{DOCKER_BASE_IMAGE}" // Використовуємо той же образ для стабільності
                     args '-v /var/run/docker.sock:/var/run/docker.sock'
                 }
             }
             steps {
                 echo "Running application container..."
-                sh "docker run -d -p 8081:5000 --name sessionmvc_container $DOCKER_IMAGE"
-            }
-        }
-    }
-
-    post {
-        always {
-            echo "Stopping and removing containers..."
-            sh 'docker stop sessionmvc_container || true'
-            sh 'docker rm sessionmvc_container || true'
-
-            // Зупиняємо залежності в тому ж Docker Compose агентові
-            agent {
-                docker {
+                // Запускаємо контейнер sessionmvc, мапимо порт 8081 хоста на 5000 контейнера,
+                // і даємо йому ім'я sessionmvc_container.
+                sh "docker run -d -p 8081:5000 --name sessionmvc_container
