@@ -3,7 +3,7 @@ services:
     image: mcr.microsoft.com/mssql/server:2022-latest
     container_name: mssql
     environment:
-      SA_PASSWORD: "Your_password123" # Розгляньте можливість використання .env файлу або Docker secrets
+      SA_PASSWORD: "Your_password123" 
       ACCEPT_EULA: "Y"
     ports:
       - "1433:1433"
@@ -19,7 +19,7 @@ services:
       retries: 10
     
   rabbitmq:
-    image: rabbitmq:3.12-management # Рекомендовано використовувати конкретну версію
+    image: rabbitmq:3.12-management 
     container_name: rabbitmq
     hostname: rabbitmq
     environment:
@@ -41,31 +41,36 @@ services:
     restart: unless-stopped
 
   mongo:
-    image: mongo:7.0 # Рекомендовано використовувати конкретну версію
+    image: mongo:7.0 
     restart: always
     container_name: mongo
     ports:
       - "27017:27017"
     environment:
       MONGO_INITDB_ROOT_USERNAME: root 
-      MONGO_INITDB_ROOT_PASSWORD: example # Розгляньте можливість використання .env файлу або Docker secrets
+      MONGO_INITDB_ROOT_PASSWORD: example 
     volumes:
       - mongo_data:/data/db 
     healthcheck:
-      test: echo 'db.runCommand("ping").ok' | mongosh localhost:27017/test --quiet
+      # Виправлено: mongosh має бути доступний, якщо базовий образ mongo його містить.
+      # Якщо ні, можна використовувати mongo shell або інший метод перевірки.
+      test: ["CMD", "mongosh", "--eval", "db.runCommand('ping').ok"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
     networks:
       - devnetwork
     
   sessionmvc:
-    image: sessionmvc # Цей образ буде зібрано локально, якщо не знайдено
+    image: sessionmvc 
     build:
       context: .
-      dockerfile: Dockerfile # ВИПРАВЛЕНО: Dockerfile тепер у корені
+      dockerfile: Dockerfile # Оскільки Dockerfile тепер у корені
     environment:
-      - ASPNETCORE_ENVIRONMENT=Development
+      - ASPNETCORE_ENVIRONMENT=Development 
       # ASPNETCORE_HTTP_PORTS=5000 # Встановлюється у Dockerfile
       - ConnectionStrings__AssessmentDbConnectionString=Server=db;Database=Assessment;User=sa;Password=Your_password123;Encrypt=False;TrustServerCertificate=True
-      - MongoConnectionString=mongodb://mongo:27017/Assessment?directConnection=true # ЗАМІНІТЬ 'Assessment' на вашу БД Mongo, якщо потрібно
+      - MongoConnectionString=mongodb://mongo:27017/Assessment?directConnection=true # Переконайтеся, що 'Assessment' - правильна назва БД
     ports:
       - "8081:5000" 
     depends_on:

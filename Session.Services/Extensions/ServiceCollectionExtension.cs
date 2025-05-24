@@ -55,14 +55,8 @@ public static class ServiceCollectionExtension
         return services;
     }
 
-    public static async Task<IServiceCollection> ValidateDatabases(this IServiceCollection services)
-    {
-        var scope = services.BuildServiceProvider().CreateScope();
-        var logger = scope.ServiceProvider.GetRequiredService<ILog>();
-
-        await DbHealthcheck.CheckSqlDbHealthAsync(scope, logger);
-        await DbHealthcheck.CheckMongoDbHealthAsync(scope, logger);
-
-        return services;
-    }
+    //public static async Task<IServiceCollection> ValidateDatabases(this WebApplication services)
+    //{
+        
+    //}
 }
