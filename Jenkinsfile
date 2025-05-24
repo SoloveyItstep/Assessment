@@ -8,7 +8,6 @@ pipeline {
   stages {
     stage('Checkout') {
       steps {
-        // Клон коду у робочу теку
         checkout scm
       }
     }
@@ -29,10 +28,8 @@ pipeline {
             --logger "trx;LogFileName=testresults.trx" \
             --results-directory TestResults
         '''
-        // Переконаємося, що результати лежать у TestResults
-        sh 'mkdir -p TestResults && rm -f TestResults/*.xml'
-
-        // Конвертуємо .trx → JUnit-xml і публікуємо
+        // Прибираємо старі XML, генеруємо нові, конвертуємо і публікуємо
+        sh 'rm -rf TestResults/*.xml'
         sh '''
           export PATH="$PATH:$HOME/.dotnet/tools"
           if ! command -v trx2junit >/dev/null 2>&1; then
@@ -52,18 +49,8 @@ pipeline {
 
     stage('Start Dependencies') {
       steps {
-        script {
-          // Отримуємо ID поточного Jenkins-контейнера
-          def cid = sh(script: 'hostname', returnStdout: true).trim()
-          // Піднімаємо сервіси з docker-compose.yml
-          sh """
-            docker run --rm \\
-              --volumes-from ${cid} \\
-              -v /var/run/docker.sock:/var/run/docker.sock \\
-              -w ${WORKSPACE} \\
-              docker/compose:latest up -d
-          """
-        }
+        // Піднімаємо всі сервіси з docker-compose.yml (мрежі, бд, кеш, rabbitmq тощо)
+        sh 'docker compose up -d'
       }
     }
 
@@ -76,21 +63,12 @@ pipeline {
 
   post {
     always {
-      // Зупиняємо та видаляємо контейнер з додатком
+      // Зупиняємо та видаляємо основний контейнер
       sh 'docker stop sessionmvc_container || true'
-      sh 'docker rm   sessionmvc_container   || true'
+      sh 'docker rm   sessionmvc_container || true'
 
-      // І згортаємо залежності
-      script {
-        def cid = sh(script: 'hostname', returnStdout: true).trim()
-        sh """
-          docker run --rm \\
-            --volumes-from ${cid} \\
-            -v /var/run/docker.sock:/var/run/docker.sock \\
-            -w ${WORKSPACE} \\
-            docker/compose:latest down || true
-        """
-      }
+      // Згортаємо залежності
+      sh 'docker compose down || true'
     }
   }
 }
