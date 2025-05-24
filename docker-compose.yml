@@ -5,8 +5,8 @@ services:
     environment:
       SA_PASSWORD: "Your_password123" 
       ACCEPT_EULA: "Y"
-    ports:
-      - "1433:1433"
+    #ports:
+    #  - "1433:1433"
     volumes:
       - sqlvolume:/var/opt/mssql
     networks:
@@ -30,10 +30,10 @@ services:
       interval: 10s 
       timeout: 10s
       retries: 5
-    ports:
-      - "5672:5672"
-      - "15672:15672"
-      - "5552:5552" 
+    #ports:
+    #  - "5672:5672"
+    #  - "15672:15672"
+    #  - "5552:5552" 
     volumes:
       - rabbitmq_data:/var/lib/rabbitmq 
     networks:
@@ -44,8 +44,8 @@ services:
     image: mongo:7.0 
     restart: always
     #container_name: mongo
-    ports:
-      - "27017:27017"
+    #ports:
+    #  - "27017:27017"
     environment:
       MONGO_INITDB_ROOT_USERNAME: root 
       MONGO_INITDB_ROOT_PASSWORD: example 
