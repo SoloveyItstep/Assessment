@@ -18,7 +18,7 @@ pipeline {
                 // Спочатку робимо checkout, щоб визначити гілку
                 checkout scm
                 script {
-                    env.GIT_BRANCH_NAME = शांतिscm.branches[0].name // Отримуємо ім'я поточної гілки
+                    env.GIT_BRANCH_NAME = scm.branches[0].name // Отримуємо ім'я поточної гілки
                     echo "Current Git branch: ${env.GIT_BRANCH_NAME}"
 
                     // Визначаємо середовище на основі гілки Git
