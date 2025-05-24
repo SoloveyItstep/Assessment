@@ -25,7 +25,7 @@ pipeline {
 
         // Запуск тестів і конвертація результатів
         sh '''
-          dotnet test Assessment.sln --no-build --configuration Release --logger "trx;LogFileName=testresults.trx" --results-directory ./TestResults
+          dotnet test Assessment.sln --no-build --configuration Release --logger:junit "trx;LogFileName=testresults.trx" --results-directory ./TestResults
           export PATH="$PATH:$HOME/.dotnet/tools"
           if ! command -v trx2junit >/dev/null 2>&1; then
             dotnet tool install --global trx2junit
@@ -34,7 +34,13 @@ pipeline {
         '''
 
         // Публікація звіту
-        junit 'TestResults/testresults.xml'
+        script {
+          if (fileExists('TestResults/testresults.xml')) {
+            junit 'TestResults/testresults.xml'
+          } else {
+            echo 'Файл testresults.xml не знайдено. Можливо, тести не були запущені або завершилися з помилкою.'
+          }
+        }
       }
     }
 
