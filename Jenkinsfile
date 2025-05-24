@@ -3,20 +3,18 @@ pipeline {
 
   environment {
     DOCKER_IMAGE = 'sessionmvc-app:latest'
-    // потрібна змінна для mount в docker/compose:
-    WORKSPACE = "${env.WORKSPACE}"
   }
 
   stages {
-
     stage('Checkout') {
       steps {
+        // Клонування коду в корінь воркспейсу
         checkout scm
       }
     }
 
     stage('Build & Test') {
-      // збірка + тести у контейнері .NET
+      // Виконуємо в .NET SDK контейнері
       agent {
         docker {
           image 'mcr.microsoft.com/dotnet/sdk:9.0'
@@ -24,11 +22,10 @@ pipeline {
         }
       }
       steps {
-        // Відновлення і збірка
         sh 'dotnet restore Assessment.sln'
         sh 'dotnet build Assessment.sln --configuration Release --no-restore'
 
-        // Запуск тестів у TRX
+        // Запускаємо тести з trx-логом
         sh '''
           dotnet test Assessment.sln \
             --no-build --configuration Release \
@@ -36,7 +33,7 @@ pipeline {
             --results-directory TestResults
         '''
 
-        // Конвертація TRX → JUnit-XML
+        // Конвертуємо trx → junit
         sh 'mkdir -p TestResults && rm -f TestResults/*.xml'
         sh '''
           export PATH="$PATH:$HOME/.dotnet/tools"
@@ -46,7 +43,6 @@ pipeline {
           trx2junit TestResults/testresults.trx
         '''
 
-        // Публікація в Jenkins
         junit 'TestResults/*.xml'
       }
     }
@@ -59,14 +55,19 @@ pipeline {
 
     stage('Start Dependencies') {
       steps {
-        // Піднімаємо залежності з docker-compose.yml через офіційний образ
-        sh '''
-          docker run --rm \
-            -v /var/run/docker.sock:/var/run/docker.sock \
-            -v "$WORKSPACE":/workspace \
-            -w /workspace \
-            docker/compose:latest up -d
-        '''
+        script {
+          // Отримуємо ID поточного Jenkins-контейнера
+          def jenkinsCid = sh(script: 'hostname', returnStdout: true).trim()
+
+          // Запускаємо docker-compose у окремому контейнері, змонтувавши робочу теку
+          sh """
+            docker run --rm \\
+              --volumes-from ${jenkinsCid} \\
+              -v /var/run/docker.sock:/var/run/docker.sock \\
+              -w ${env.WORKSPACE} \\
+              docker/compose:2.20.2 up -d
+          """
+        }
       }
     }
 
@@ -79,18 +80,21 @@ pipeline {
 
   post {
     always {
-      // Зупиняємо та видаляємо контейнер додатку
+      // Зупинка та видалення контейнера додатку
       sh 'docker stop sessionmvc_container || true'
       sh 'docker rm   sessionmvc_container   || true'
 
-      // Прибираємо залежності через той самий образ compose
-      sh '''
-        docker run --rm \
-          -v /var/run/docker.sock:/var/run/docker.sock \
-          -v "$WORKSPACE":/workspace \
-          -w /workspace \
-          docker/compose:latest down || true
-      '''
+      // Згортаємо залежності через той самий образ compose
+      script {
+        def jenkinsCid = sh(script: 'hostname', returnStdout: true).trim()
+        sh """
+          docker run --rm \\
+            --volumes-from ${jenkinsCid} \\
+            -v /var/run/docker.sock:/var/run/docker.sock \\
+            -w ${env.WORKSPACE} \\
+            docker/compose:2.20.2 down || true
+        """
+      }
     }
   }
 }
