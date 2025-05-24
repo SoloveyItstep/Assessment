@@ -33,7 +33,7 @@ pipeline {
     environment {
         APP_IMAGE_NAME = 'sessionmvc'
         DOTNET_SDK_VERSION = '9.0'
-        ERROR_NOTIFICATION_EMAIL = 'your-email@example.com' // ЗАМІНІТЬ
+        ERROR_NOTIFICATION_EMAIL = 'solovey.itstep@gmial.com' // ЗАМІНІТЬ
 
         GIT_BRANCH_NAME              = "${env.BRANCH_NAME}"
         DEPLOY_ENVIRONMENT           = determineDeployEnvironment(env.BRANCH_NAME)
@@ -124,7 +124,7 @@ pipeline {
                 script {
                     echo "Preparing to deploy to ${env.DEPLOY_ENVIRONMENT} environment using ASPNETCORE_ENVIRONMENT=${env.ASPNETCORE_ENVIRONMENT_FOR_APP}"
                     
-                    def composeFiles = "-f docker-compose.development.yml"
+                    def composeFiles = "-f docker-compose.yml"
                     def overrideFileName = (env.DEPLOY_ENVIRONMENT != null && env.DEPLOY_ENVIRONMENT != "null") ? "docker-compose.${env.DEPLOY_ENVIRONMENT.toLowerCase()}.yml" : null
                     
                     if (overrideFileName != null && fileExists(overrideFileName)) {
