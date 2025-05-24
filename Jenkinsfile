@@ -3,6 +3,8 @@ pipeline {
 
     environment {
         DOCKER_IMAGE = 'sessionmvc-app:latest'
+        DOCKER_BASE_IMAGE = 'alpine/git' // Цей образ вже має git та базові утиліти
+        DOCKER_COMPOSE_VERSION = '2.27.0' // Конкретна версія docker compose, яку ми завантажимо
     }
 
     stages {
@@ -48,37 +50,41 @@ pipeline {
         }
 
         stage('Start Dependencies') {
-            steps {
-                echo "Starting Docker Compose dependencies using plugin (via script block)..."
-                script {
-                    // Виклик плагіна Docker Compose Build Step
-                    // Перевірте Snippet Generator для точного синтаксису,
-                    // але це має бути щось на кшталт:
-                    // step([$class: 'DockerComposeBuilder',
-                    //       dockerComposeFile: 'docker-compose.yml',
-                    //       executeCommandInsideContainer: [],
-                    //       startAllServices: true, // Це для 'up -d'
-                    //       stopAllServices: false // Не зупиняємо тут
-                    // ])
-
-                    // Краще використовувати параметри, які імітують команду `up -d`
-                    // Це може бути або 'StartAllServices', або 'ExecuteCommandInsideContainer'
-                    // Давайте використаємо ExecuteCommandInsideContainer, щоб бути гнучкими
-                    step([$class: 'DockerComposeBuilder',
-                          // Обираємо команду для виконання
-                          dockerComposeCommand: [
-                              $class: 'ExecuteCommandInsideContainer', // Це виконує довільну команду
-                              command: 'up -d', // Саме тут передаємо команду Docker Compose
-                              // service: '', // Якщо ви не вказуєте конкретний сервіс, то команду виконують для всіх.
-                              // workDir: '' // Робочий каталог, якщо docker-compose.yml не в корені.
-                          ],
-                          dockerComposeFile: 'docker-compose.yml' // Шлях до файлу docker-compose.yml
-                    ])
+            agent {
+                docker {
+                    image "${DOCKER_BASE_IMAGE}"
+                    args '-v /var/run/docker.sock:/var/run/docker.sock' // Доступ до Docker Daemon
                 }
+            }
+            steps {
+                echo "DEBUG: Current working directory inside ${DOCKER_BASE_IMAGE} container:"
+                sh 'pwd'
+                echo "DEBUG: Listing contents inside ${DOCKER_BASE_IMAGE} container:"
+                sh 'ls -la'
+                echo "Installing Docker Compose v${DOCKER_COMPOSE_VERSION}..."
+                sh '''
+                    # Встановлюємо curl та інші необхідні пакети
+                    apk add --no-cache curl
+
+                    # Завантажуємо бінарник Docker Compose v2.x.x
+                    curl -L "https://github.com/docker/compose/releases/download/v${DOCKER_COMPOSE_VERSION}/docker-compose-linux-$(uname -m)" \\
+                    -o /usr/local/bin/docker-compose
+
+                    # Робимо його виконуваним
+                    chmod +x /usr/local/bin/docker-compose
+
+                    # Перевіряємо версію (для відладки)
+                    docker-compose version
+
+                    echo "Starting Docker Compose services..."
+                    # Запускаємо сервіси за допомогою docker-compose (старий синтаксис, але бінарник v2)
+                    docker-compose up -d
+                '''
             }
         }
 
         stage('Run App Container') {
+            agent any
             steps {
                 echo "Running application container..."
                 sh "docker run -d -p 8081:5000 --name sessionmvc_container $DOCKER_IMAGE"
@@ -92,15 +98,22 @@ pipeline {
             sh 'docker stop sessionmvc_container || true'
             sh 'docker rm sessionmvc_container || true'
 
-            script {
-                // Виклик плагіна Docker Compose Build Step для 'down'
-                step([$class: 'DockerComposeBuilder',
-                      dockerComposeCommand: [
-                          $class: 'ExecuteCommandInsideContainer',
-                          command: 'down --volumes' // Команда down з опцією видалення томів
-                      ],
-                      dockerComposeFile: 'docker-compose.yml'
-                ])
+            agent {
+                docker {
+                    image "${DOCKER_BASE_IMAGE}"
+                    args '-v /var/run/docker.sock:/var/run/docker.sock'
+                }
+            }
+            steps {
+                echo "Stopping Docker Compose services..."
+                sh '''
+                    apk add --no-cache curl # Забезпечуємо наявність curl для завантаження docker-compose
+                    curl -L "https://github.com/docker/compose/releases/download/v${DOCKER_COMPOSE_VERSION}/docker-compose-linux-$(uname -m)" \\
+                    -o /usr/local/bin/docker-compose
+                    chmod +x /usr/local/bin/docker-compose
+
+                    docker-compose down --volumes
+                '''
             }
         }
     }
