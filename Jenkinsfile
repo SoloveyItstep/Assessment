@@ -1,5 +1,10 @@
 pipeline {
-  agent any
+  agent {
+    docker {
+      image 'mcr.microsoft.com/dotnet/sdk:9.0'
+      args '-v /var/run/docker.sock:/var/run/docker.sock'
+    }
+  }
 
   environment {
     DOCKER_IMAGE = 'sessionmvc-app:latest'
@@ -36,6 +41,7 @@ pipeline {
         sh 'docker build -t $DOCKER_IMAGE .'
       }
     }
+
     stage('Start Dependencies') {
       steps {
         sh 'docker-compose up -d'
