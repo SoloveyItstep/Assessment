@@ -1,42 +1,44 @@
 pipeline {
-  agent {
-    docker {
-      image 'mcr.microsoft.com/dotnet/sdk:9.0'
-      args '-v /var/run/docker.sock:/var/run/docker.sock'
-    }
-  }
+  agent any
 
   environment {
     DOCKER_IMAGE = 'sessionmvc-app:latest'
   }
 
   stages {
-    stage('Checkout') {
-      steps {
-        git url: 'https://github.com/SoloveyItstep/Assessment.git', branch: 'master'
+    stage('Dotnet Tasks') {
+      agent {
+        docker {
+          image 'mcr.microsoft.com/dotnet/sdk:9.0'
+          args '-v /var/run/docker.sock:/var/run/docker.sock'
+        }
+      }
+      stages {
+        stage('Checkout') {
+          steps {
+            git url: 'https://github.com/SoloveyItstep/Assessment.git', branch: 'master'
+          }
+        }
+        stage('Restore') {
+          steps {
+            sh 'dotnet restore Assessment.sln'
+          }
+        }
+        stage('Build') {
+          steps {
+            sh 'dotnet build Assessment.sln --configuration Release --no-restore'
+          }
+        }
+        stage('Test') {
+          steps {
+            sh "dotnet test Assessment.sln --no-build --configuration Release --logger 'trx;LogFileName=testresults.trx' --results-directory ./TestResults"
+            junit 'TestResults/testresults.trx'
+          }
+        }
       }
     }
 
-    stage('Restore Dependencies') {
-      steps {
-        sh 'dotnet restore Assessment.sln'
-      }
-    }
-
-    stage('Build') {
-      steps {
-        sh 'dotnet build Assessment.sln --configuration Release --no-restore'
-      }
-    }
-
-    stage('Test') {
-      steps {
-        sh 'dotnet test Assessment.sln --no-build --configuration Release --logger trx;LogFileName=testresults.trx --results-directory ./TestResults'
-        junit 'TestResults/testresults.trx'
-      }
-    }
-
-    stage('Build Docker Image') {
+    stage('Docker Build') {
       steps {
         sh 'docker build -t $DOCKER_IMAGE .'
       }
@@ -48,7 +50,7 @@ pipeline {
       }
     }
 
-    stage('Run Docker Container') {
+    stage('Run App Container') {
       steps {
         sh 'docker run -d -p 8081:5000 --name sessionmvc_container $DOCKER_IMAGE'
       }
