@@ -60,8 +60,8 @@ pipeline {
 
     stage('Start Dependencies') {
       steps {
-        // Використовуємо вбудований Docker Compose
-        sh 'docker compose up -d'
+        // замінили -d на --detach
+        sh 'docker compose up --detach'
       }
     }
 
@@ -76,7 +76,8 @@ pipeline {
     always {
       sh 'docker stop sessionmvc_container || true'
       sh 'docker rm   sessionmvc_container || true'
-      // опціонально: sh 'docker compose down || true'
+      // опціонально, щоб зачистити залежності:
+      // sh 'docker compose down || true'
     }
   }
 }
