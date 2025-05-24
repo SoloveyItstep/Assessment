@@ -125,12 +125,12 @@ pipeline {
                     echo "Preparing to deploy to ${env.DEPLOY_ENVIRONMENT} environment using ASPNETCORE_ENVIRONMENT=${env.ASPNETCORE_ENVIRONMENT_FOR_APP}"
                     
                     def composeFiles = "-f docker-compose.development.yml"
-                    #def overrideFileName = (env.DEPLOY_ENVIRONMENT != null && env.DEPLOY_ENVIRONMENT != "null") ? "docker-compose.${env.DEPLOY_ENVIRONMENT.toLowerCase()}.yml" : null
+                    //def overrideFileName = (env.DEPLOY_ENVIRONMENT != null && env.DEPLOY_ENVIRONMENT != "null") ? "docker-compose.${env.DEPLOY_ENVIRONMENT.toLowerCase()}.yml" : null
                     
-                    #if (overrideFileName != null && fileExists(overrideFileName)) {
-                    #    composeFiles += " -f ${overrideFileName}"
-                    #    echo "Using override file: ${overrideFileName}"
-                    #} #else {
+                    //if (overrideFileName != null && fileExists(overrideFileName)) {
+                    //    composeFiles += " -f ${overrideFileName}"
+                    //    echo "Using override file: ${overrideFileName}"
+                    //} else {
                         if (env.DEPLOY_ENVIRONMENT == 'Production' && overrideFileName != null) {
                             echo "WARNING: Production override file (${overrideFileName}) not found! Using default docker-compose.yml for Production."
                         } else if (overrideFileName != null || (env.DEPLOY_ENVIRONMENT != null && env.DEPLOY_ENVIRONMENT != "null")) {
@@ -138,7 +138,7 @@ pipeline {
                         } else {
                             echo "DEPLOY_ENVIRONMENT is null or invalid, using default docker-compose.development.yml."
                         }
-                    #}
+                    //}
 
                     echo "Stopping and removing existing services (if any) using compose files: ${composeFiles}"
                     sh script: "docker-compose ${composeFiles} down --remove-orphans", returnStatus: true
