@@ -3,15 +3,53 @@ pipeline {
 
     environment {
         DOCKER_IMAGE = 'sessionmvc-app:latest'
-        // Спробуємо іншу, можливо, більш стабільну або нову версію образу docker-compose,
-        // якщо docker/compose:latest дасть той самий результат з "Can't find a suitable configuration file"
-        // тоді це не в версії проблема, а в тому, як Docker монтує томи або права.
-        DOCKER_COMPOSE_IMAGE = 'docker/compose:2.27.0' // Спробуйте конкретну версію, або 'latest'
-                                                      // Або навіть повернутися до '1.29.2' для відладки
+        // Змінюємо образ Docker Compose на конкретну версію docker/cli
+        DOCKER_CLI_IMAGE = 'docker/cli:24.0.9' // Або іншу стабільну версію, яку ви можете знайти на Docker Hub.
+                                                // Важливо: переконайтеся, що цей образ має в собі плагін 'compose'.
+                                                // Більшість сучасних офіційних образів docker/cli його мають.
     }
 
     stages {
-        // ... (попередні етапи без змін) ...
+        stage('Checkout') {
+            steps {
+                checkout scm
+            }
+        }
+
+        stage('Build & Test') {
+            agent {
+                docker {
+                    image 'mcr.microsoft.com/dotnet/sdk:9.0'
+                    args '-v /var/run/docker.sock:/var/run/docker.sock'
+                }
+            }
+            steps {
+                sh 'dotnet restore Assessment.sln'
+                sh 'dotnet build Assessment.sln --configuration Release --no-restore'
+                sh '''
+                    dotnet test Assessment.sln \\
+                      --no-build --configuration Release \\
+                      --logger "trx;LogFileName=testresults.trx" \\
+                      --results-directory TestResults
+                '''
+                sh 'mkdir -p TestResults'
+                sh 'rm -f TestResults/testresults.xml'
+                sh '''
+                    export PATH="$PATH:$HOME/.dotnet/tools"
+                    if ! command -v trx2junit >/dev/null 2>&1; then
+                        dotnet tool install --global trx2junit
+                    fi
+                    trx2junit TestResults/testresults.trx
+                '''
+                junit 'TestResults/*.xml'
+            }
+        }
+
+        stage('Docker Build') {
+            steps {
+                sh 'docker build -t $DOCKER_IMAGE .'
+            }
+        }
 
         stage('Start Dependencies') {
             steps {
@@ -20,14 +58,14 @@ pipeline {
                 echo "DEBUG: Listing contents of current directory:"
                 sh 'ls -la'
 
-                // Використовуємо стару команду, але з новим ім'ям образу
+                // Використовуємо docker/cli:24.0.9 і новий синтаксис 'compose'
                 sh '''
                     docker run --rm \
                         -v /var/run/docker.sock:/var/run/docker.sock \
                         -v $WORKSPACE:$WORKSPACE \
                         -w $WORKSPACE \
-                        ${DOCKER_COMPOSE_IMAGE} \
-                        up -d
+                        ${DOCKER_CLI_IMAGE} \
+                        compose up -d
                 '''
             }
         }
@@ -49,13 +87,14 @@ pipeline {
             echo "DEBUG: Listing contents of current directory (post-action):"
             sh 'ls -la'
 
+            // Використовуємо docker/cli:24.0.9 і новий синтаксис 'compose'
             sh '''
                 docker run --rm \
                     -v /var/run/docker.sock:/var/run/docker.sock \
                     -v $WORKSPACE:$WORKSPACE \
                     -w $WORKSPACE \
-                    ${DOCKER_COMPOSE_IMAGE} \
-                    down
+                    ${DOCKER_CLI_IMAGE} \
+                    compose down
             '''
         }
     }
