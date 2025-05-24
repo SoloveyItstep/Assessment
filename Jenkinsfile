@@ -25,17 +25,17 @@ pipeline {
             }
         }
 
-        stage('Build Application (.NET)') {
+    stage('Build Application (.NET)') {
             agent {
-                // Використовуємо Docker-контейнер з .NET SDK для збірки
                 docker {
                     image "mcr.microsoft.com/dotnet/sdk:${env.DOTNET_SDK_VERSION}"
                     // args '-u root' // Розкоментуйте, якщо виникають проблеми з правами доступу всередині контейнера
                 }
             }
             steps {
+                echo "Current directory listing inside the container:"
+                sh 'ls -la' // <--- ДОДАЙТЕ ЦЕЙ РЯДОК
                 echo "Building the ASP.NET Core application (Solution: SessionMvc.sln)..."
-                // Оскільки SessionMvc.sln знаходиться в корені, можна просто виконати:
                 sh 'dotnet build SessionMvc.sln --configuration Release'
             }
         }
