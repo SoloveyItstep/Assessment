@@ -13,28 +13,28 @@ pipeline {
           args '-v /var/run/docker.sock:/var/run/docker.sock'
         }
       }
-      stages {
-        stage('Checkout') {
-          steps {
-            git url: 'https://github.com/SoloveyItstep/Assessment.git', branch: 'master'
-          }
-        }
-        stage('Restore') {
-          steps {
-            sh 'dotnet restore Assessment.sln'
-          }
-        }
-        stage('Build') {
-          steps {
-            sh 'dotnet build Assessment.sln --configuration Release --no-restore'
-          }
-        }
-        stage('Test') {
-          steps {
-            sh "dotnet test Assessment.sln --no-build --configuration Release --logger 'trx;LogFileName=testresults.trx' --results-directory ./TestResults"
-            junit 'TestResults/testresults.trx'
-          }
-        }
+      steps {
+        // Клонування репозиторію
+        git url: 'https://github.com/SoloveyItstep/Assessment.git', branch: 'master'
+
+        // Відновлення залежностей
+        sh 'dotnet restore Assessment.sln'
+
+        // Побудова проєкту
+        sh 'dotnet build Assessment.sln --configuration Release --no-restore'
+
+        // Запуск тестів і конвертація результатів
+        sh '''
+          dotnet test Assessment.sln --no-build --configuration Release --logger "trx;LogFileName=testresults.trx" --results-directory ./TestResults
+          export PATH="$PATH:$HOME/.dotnet/tools"
+          if ! command -v trx2junit >/dev/null 2>&1; then
+            dotnet tool install --global trx2junit
+          fi
+          trx2junit ./TestResults/testresults.trx
+        '''
+
+        // Публікація звіту
+        junit 'TestResults/testresults.xml'
       }
     }
 
