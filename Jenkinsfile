@@ -51,6 +51,7 @@ pipeline {
                         echo "Workspace contents:"
                         sh 'ls -la' 
                         
+                        // Dockerfile тепер у корені
                         def appImage = docker.build("sessionmvc-app:${env.BUILD_NUMBER}", "-f Dockerfile .")
                         echo "Successfully built Docker image: ${appImage.id}"
                     } catch (e) {
@@ -67,21 +68,21 @@ pipeline {
                 script {
                     echo 'Running the SessionMVC Docker image with environment variables...'
                     def sqlConnectionString = "Server=db;Database=Assessment;User=sa;Password=Your_password123;Encrypt=False;TrustServerCertificate=True"
-                    // Переконайтеся, що 'Assessment' - правильна назва БД для Mongo, або інша, яку використовує ваш додаток
-                    def mongoConnectionString = "mongodb://mongo:27017/Assessment?directConnection=true" 
+                    // Переконайтеся, що 'Assessment' - правильна назва БД для Mongo у ваших appsettings.json або тут
+                    def mongoConnectionStringVal = "mongodb://mongo:27017/Assessment?directConnection=true" 
 
                     sh "docker rm -f sessionmvc-run-${env.BUILD_NUMBER} || true"
 
-                    // Додаємо --network devnetwork, щоб контейнер був у тій самій мережі, що й сервіси з docker-compose
-                    // Переконайтеся, що мережа devnetwork існує (створена docker-compose up)
+                    // ВИПРАВЛЕНО: Прибрано --network devnetwork для цього ізольованого тестового запуску.
+                    // Додаток, ймовірно, не зможе підключитися до БД на цьому етапі (якщо БД в іншій мережі),
+                    // але сам контейнер має запуститися без помилки "network not found".
                     sh """
                         docker run -d \
                             -p 8081:5000 \
                             --name sessionmvc-run-${env.BUILD_NUMBER} \
-                            --network devnetwork \
                             -e ASPNETCORE_ENVIRONMENT=Development \
                             -e "ConnectionStrings__AssessmentDbConnectionString=${sqlConnectionString}" \
-                            -e "MongoConnectionString=${mongoConnectionString}" \
+                            -e "MongoConnectionString=${mongoConnectionStringVal}" \
                             sessionmvc-app:${env.BUILD_NUMBER}
                     """
                     echo "SessionMVC app starting on http://localhost:8081"
@@ -91,7 +92,8 @@ pipeline {
                     echo "Checking container status for sessionmvc-run-${env.BUILD_NUMBER}:"
                     sh "docker ps -a --filter name=sessionmvc-run-${env.BUILD_NUMBER}"
                     echo "Fetching logs from sessionmvc-run-${env.BUILD_NUMBER}:"
-                    sh "docker logs --tail 200 sessionmvc-run-${env.BUILD_NUMBER} || echo 'Could not fetch logs or container exited.'"
+                    // Збільшено кількість рядків логу для кращої діагностики
+                    sh "docker logs --tail 500 sessionmvc-run-${env.BUILD_NUMBER} || echo 'Could not fetch logs or container exited.'"
 
                     echo "Stopping and removing the SessionMVC container..."
                     sh "docker stop sessionmvc-run-${env.BUILD_NUMBER} || echo 'Container already stopped or not found'"
