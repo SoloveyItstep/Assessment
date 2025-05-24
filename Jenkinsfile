@@ -33,18 +33,13 @@ pipeline {
         }
       }
       steps {
-        // Запуск тестів із TRX-логером
         sh '''
           dotnet test Assessment.sln \
             --no-build --configuration Release \
             --logger "trx;LogFileName=testresults.trx" \
             --results-directory ./TestResults
         '''
-
-        // Почистимо старі XML (файли та папки)
         sh 'rm -rf TestResults/*.xml TestResults/*.xml*/'
-
-        // Встановлюємо trx2junit (якщо потрібно) і конвертуємо у JUnit XML
         sh '''
           export PATH="$PATH:$HOME/.dotnet/tools"
           if ! command -v trx2junit >/dev/null 2>&1; then
@@ -52,11 +47,7 @@ pipeline {
           fi
           trx2junit ./TestResults/testresults.trx
         '''
-
-        // Перевіримо, що зʼявився XML-звіт
         sh 'ls -la TestResults'
-
-        // Публікуємо всі JUnit-звіти
         junit 'TestResults/*.xml'
       }
     }
@@ -69,7 +60,8 @@ pipeline {
 
     stage('Start Dependencies') {
       steps {
-        sh 'docker-compose up -d'
+        // Використовуємо вбудований Docker Compose
+        sh 'docker compose up -d'
       }
     }
 
@@ -84,6 +76,7 @@ pipeline {
     always {
       sh 'docker stop sessionmvc_container || true'
       sh 'docker rm   sessionmvc_container || true'
+      // опціонально: sh 'docker compose down || true'
     }
   }
 }
