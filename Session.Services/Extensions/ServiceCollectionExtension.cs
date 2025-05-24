@@ -8,9 +8,9 @@ using Session.Application.Repositories;
 using Session.Persistence.Contexts;
 using Session.Persistence.Repositories;
 using Session.Services.Mapping;
+using Session.Services.Middleware;
 using Session.Services.Services;
 using Session.Services.Services.Interfaces;
-using SessionMVC.Middleware;
 
 namespace Session.Services.Extensions;
 
@@ -18,7 +18,6 @@ public static class ServiceCollectionExtension
 {
     public static IServiceCollection AddSessionServices(this IServiceCollection services, string connectionString, string mongoConnectionString)
     {
-        //var MongoDbUri = Environment.GetEnvironmentVariable("MongoConnectionString");
         services.AddSingleton<IMongoClient>(sp =>
         {
             var configuration = sp.GetRequiredService<IConfiguration>();
@@ -46,9 +45,6 @@ public static class ServiceCollectionExtension
             var databaseName = MongoUrl.Create(connectionString).DatabaseName; // Отримати ім'я БД з рядка
             if (string.IsNullOrEmpty(databaseName))
             {
-                // Якщо ім'я БД не вказано в рядку, можливо, його треба додати або взяти з іншого місця конфігурації
-                // Для вашого рядка "mongodb://root:example@mongo:27017/Assessment?authSource=admin&directConnection=true"
-                // databaseName буде "Assessment"
                 throw new InvalidOperationException("Database name not found in MongoConnectionString.");
             }
             return client.GetDatabase(databaseName);

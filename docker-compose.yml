@@ -66,9 +66,9 @@ services:
       dockerfile: Dockerfile
     environment:
       - ASPNETCORE_ENVIRONMENT=Development 
-      - ConnectionStrings__AssessmentDbConnectionString=Server=db;Database=Assessment;User=sa;Password=Your_password123;Encrypt=False;TrustServerCertificate=True
+      #- ConnectionStrings__AssessmentDbConnectionString=Server=db;Database=Assessment;User=sa;Password=Your_password123;Encrypt=False;TrustServerCertificate=True
       # ВИПРАВЛЕНО: Додано ім'я користувача, пароль та authSource для MongoDB
-      - MongoConnectionString=mongodb://root:example@mongo:27017/Assessment?authSource=admin&directConnection=true
+      #- MongoConnectionString=mongodb://root:example@mongo:27017/Assessment?authSource=admin&directConnection=true
       # ВИПРАВЛЕНО: Чітко вказуємо Kestrel слухати тільки HTTP на порту 5000 всередині контейнера
       - ASPNETCORE_URLS=http://+:5000
     ports:
