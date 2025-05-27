@@ -1,8 +1,7 @@
 pipeline {
     agent {
         docker {
-            // Використовуємо 8.0, оскільки 9.0 ще в preview, а 8.0 LTS
-            image 'mcr.microsoft.com/dotnet/sdk:8.0'
+            image 'mcr.microsoft.com/dotnet/sdk:9.0'
             args '-v $HOME/.nuget:/root/.nuget'
         }
     }
