@@ -1,19 +1,16 @@
 pipeline {
     agent {
-        // Визначаємо Docker образ для всього пайплайну
-        // Це гарантує, що команда 'dotnet' буде доступна на будь-якому етапі
         docker {
-            image 'mcr.microsoft.com/dotnet/sdk:9.0'
-            args '-v $HOME/.nuget:/root/.nuget' // Дозволяє кешувати NuGet пакети поза контейнером, прискорюючи restore
+            // Використовуємо 8.0, оскільки 9.0 ще в preview, а 8.0 LTS
+            image 'mcr.microsoft.com/dotnet/sdk:8.0'
+            args '-v $HOME/.nuget:/root/.nuget'
         }
     }
 
     environment {
-        // Визначення змінних середовища для всього пайплайну
-        BRANCH_NAME = "${env.GIT_BRANCH_NAME ?: 'master'}" // Якщо у вас мульти-гілковий пайплайн, використовує ім'я гілки
-        DEPLOY_ENV = "Production" // Або інша змінна для середовища розгортання
-        ASPNETCORE_ENVIRONMENT = "Production" // Для конфігурації ASP.NET Core
-        // Отримання короткого Git-хешу для тегів образів Docker
+        BRANCH_NAME = "${env.GIT_BRANCH_NAME ?: 'master'}"
+        DEPLOY_ENV = "Production"
+        ASPNETCORE_ENVIRONMENT = "Production"
         IMAGE_TAG_SHORT = sh(returnStdout: true, script: 'git rev-parse --short HEAD').trim()
         IMAGE_TAGS = "sessionmvc:latest, sessionmvc:${env.IMAGE_TAG_SHORT}, sessionmvc:${env.DEPLOY_ENV}-${env.IMAGE_TAG_SHORT}"
     }
@@ -32,36 +29,38 @@ pipeline {
 
         stage('Restore') {
             steps {
-                sh 'dotnet restore'
+                // *** ЗМІНА ТУТ ***
+                // Вказуємо шлях до файлу рішення
+                sh 'dotnet restore Assessment.sln'
             }
         }
 
         stage('Build') {
             steps {
-                // Збираємо рішення, не відновлюючи пакети повторно
-                sh 'dotnet build --no-restore --configuration Release'
+                echo "Building solution (Solution: Assessment.sln)..."
+                // *** ЗМІНА ТУТ ***
+                // Вказуємо шлях до файлу рішення
+                sh 'dotnet build Assessment.sln --no-restore --configuration Release'
             }
         }
 
         stage('Test and Collect Coverage') {
             steps {
                 echo "Running .NET tests and collecting coverage (Solution: Assessment.sln)..."
-                // Виконуємо тести та збираємо покриття в один крок
-                // Зверніть увагу: шлях до TestResults/coverage.xml відносно WORKSPACE
+                // *** ЗМІНА ТУТ ***
+                // Вказуємо шлях до файлу рішення
                 sh 'dotnet test Assessment.sln ' +
                    '--configuration Release ' +
-                   '--no-build ' + // Не перезбирати проект, оскільки ми його вже зібрали на етапі 'Build'
+                   '--no-build ' +
                    '/p:CollectCoverage=true ' +
                    '/p:CoverletOutputFormat=cobertura ' +
                    '/p:CoverletOutput=${WORKSPACE}/TestResults/coverage.xml'
             }
             post {
                 always {
-                    // Публікуємо результати JUnit тестів.
-                    // **Примітка:** Ваш лог показує "No test report files were found".
-                    // Можливо, шлях до .trx файлів потребує уточнення.
-                    // Зазвичай вони знаходяться у піддиректорії: TestResults/<Назва_Тестового_Проекту>/<Унікальний_GUID>/*.trx
-                    // '**/TestResults/**/*.trx' - шукає .trx файли у будь-якій піддиректорії TestResults
+                    // Переконайтеся, що цей шлях коректний для ваших звітів JUnit
+                    // Якщо тести запускаються на рівні рішення, TRX файли можуть бути глибше.
+                    // '**/TestResults/**/*.trx' - це гарний варіант, який шукає TRX у всіх піддиректоріях TestResults
                     junit '**/TestResults/**/*.trx'
                 }
             }
@@ -69,8 +68,6 @@ pipeline {
 
         stage('Publish Coverage Report') {
             steps {
-                // Публікуємо звіт покриття за допомогою Cobertura Plugin
-                // '**/TestResults/coverage.xml' - шукає звіт у будь-якій піддиректорії TestResults
                 cobertura coberturaReportFile: '**/TestResults/coverage.xml',
                           lineCoverageTargets: '80, 90, 95',
                           branchCoverageTargets: '70, 80, 90',
@@ -79,10 +76,13 @@ pipeline {
             }
         }
 
-        stage('Publish Application') { // Перейменовано для ясності
+        stage('Publish Application') {
             steps {
                 echo "Publishing application (Solution: Assessment.sln)..."
-                // Публікуємо ваш основний проект. Переконайтеся, що Assessment.sln включає ваш основний проект.
+                // *** ЗМІНА ТУТ ***
+                // Якщо ви публікуєте конкретний проект з рішення, вам потрібно вказати його шлях.
+                // Наприклад, 'dotnet publish Assessment/Assessment.csproj --no-build --configuration Release -o app/publish'
+                // Якщо Assessment.sln містить лише один publishable проект, то можна і так:
                 sh 'dotnet publish Assessment.sln --no-build --configuration Release -o app/publish'
             }
         }
@@ -90,31 +90,26 @@ pipeline {
         stage('Build Docker Image') {
             steps {
                 echo "Building Docker image (Image Name: sessionmvc)..."
-                // Припускаємо, що ваш Dockerfile знаходиться у корені проекту
                 script {
-                    // Формуємо список тегів для команди docker build
                     def tags = env.IMAGE_TAGS.split(', ').collect { "-t ${it.trim()}" }.join(' ')
                     sh "docker build . ${tags} -f Dockerfile"
                 }
             }
         }
 
-        stage('Push Docker Image (Skipped)') { // Залишаємо назву, як у вас
-            // Тут ви б додавали логіку для push до Docker Registry
+        stage('Push Docker Image (Skipped)') {
             steps {
                 echo "Skipping Docker image push for now."
             }
         }
 
         stage('Deploy to Environment') {
-            // Ваша логіка розгортання
             steps {
                 echo "Deploying to ${env.DEPLOY_ENV} environment..."
             }
         }
 
         stage('Git Tagging for Production') {
-            // Ваша логіка тегування Git
             steps {
                 echo "Skipping Git tagging for Production for now."
             }
@@ -123,7 +118,7 @@ pipeline {
 
     post {
         always {
-            cleanWs() // Очищуємо робочу область після кожного білду
+            cleanWs()
         }
         success {
             script {
@@ -133,7 +128,8 @@ pipeline {
         failure {
             script {
                 echo "Pipeline failed for branch ${env.BRANCH_NAME} and environment ${env.DEPLOY_ENV}!"
-                // Ваш mail плагін видає Connection refused. Перевірте налаштування SMTP у Jenkins.
+                // Також перевірте налаштування вашого SMTP-сервера в Jenkins для плагіна пошти.
+                // Connection refused вказує на те, що Jenkins не може підключитися до SMTP-сервера на localhost:25.
                 // mail(to: 'your_email@example.com', subject: "Jenkins Build Failed: ${env.JOB_NAME} - ${env.BUILD_NUMBER}", body: "Build failed: ${env.BUILD_URL}")
             }
         }
