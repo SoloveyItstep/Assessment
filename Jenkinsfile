@@ -98,12 +98,11 @@ stage('Test Application (.NET)') {
         '''
     }
     post {
-        always {
-            // замість publishCoverage — використовуємо recordCoverage
-            recordCoverage tools: [
-                cobertura(pattern: '**/TestResults/*/coverage.cobertura.xml')
-            ]
-        }
+      always {
+        recordCoverage tools: [
+          cobertura(pattern: '**/TestResults/*/coverage.cobertura.xml')
+        ]
+      }
     }
 }
 
