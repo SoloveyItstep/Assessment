@@ -85,24 +85,30 @@ pipeline {
         }
 
 stage('Test & Coverage') {
-  steps {
-    sh '''
-      dotnet test Assessment.sln \
-        --configuration Release \
-        --no-build \
-        --collect:"XPlat Code Coverage" \
-        --results-directory TestResults
-    '''
-  }
-  post {
-    success {
-      recordCoverage tools: [[
-        parser: 'Cobertura',
-        pattern: 'TestResults/*/coverage.cobertura.xml'
-      ]]
+      agent {
+        docker {
+          image 'mcr.microsoft.com/dotnet/sdk:9.0'
+          args  '-u 0:0'
+        }
+      }
+      steps {
+        sh '''
+          dotnet test Assessment.sln \
+            --configuration Release \
+            --no-build \
+            --collect:"XPlat Code Coverage" \
+            --results-directory TestResults
+        '''
+      }
+      post {
+        success {
+          recordCoverage tools: [[
+            parser : 'Cobertura',
+            pattern: 'TestResults/**/coverage.cobertura.xml'
+          ]]
+        }
+      }
     }
-  }
-}
 
 
 
