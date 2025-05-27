@@ -85,23 +85,36 @@ pipeline {
         }
 
         stage('Test Application (.NET)') {
-            agent {
-                docker {
-                    image "mcr.microsoft.com/dotnet/sdk:${env.DOTNET_SDK_VERSION}"
-                }
-            }
-            steps {
-                echo "Running .NET tests (Solution: Assessment.sln)..."
-                //sh 'dotnet test Assessment.sln --configuration Release --no-build'
-                // Collect code coverage via Coverlet
-                sh '''
-                  dotnet test \
-                    --configuration Release \
-                    --no-build \
-                    --collect:"XPlat Code Coverage"
-                '''
-            }
-        }
+         agent {
+             docker {
+                 image "mcr.microsoft.com/dotnet/sdk:${env.DOTNET_SDK_VERSION}"
+             }
+         }
+         steps {
+-            echo "Running .NET tests (Solution: Assessment.sln)..."
+-            sh '''
+-              dotnet test \
+-                --configuration Release \
+-                --no-build \
+-                --collect:"XPlat Code Coverage"
+-            '''
++            echo "Running .NET tests for Assessment.sln with coverage..."
++            sh '''
++              dotnet test Assessment.sln \
++                --configuration Release \
++                --no-build \
++                --collect:"XPlat Code Coverage"
++            '''
+         }
++        post {
++            always {
++                // публікуємо coverage у форматі Cobertura
++                publishCoverage adapters: [
++                    coberturaAdapter('**/TestResults/*/coverage.cobertura.xml')
++                ], sourceFileResolver: sourceFiles('**/Session/**/*.cs')
++            }
++        }
+     }
 
         stage('Build Docker Image') {
             steps {
