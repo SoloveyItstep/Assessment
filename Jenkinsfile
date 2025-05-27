@@ -72,17 +72,17 @@ pipeline {
             }
         }
 
-        stage('Build Application (.NET)') {
-            agent {
-                docker {
-                    image "mcr.microsoft.com/dotnet/sdk:${env.DOTNET_SDK_VERSION}"
-                }
-            }
-            steps {
-                echo "Building the ASP.NET Core application (Solution: Assessment.sln)..."
-                sh 'dotnet build Assessment.sln --configuration Release'
-            }
-        }
+        //stage('Build Application (.NET)') {
+        //    agent {
+        //        docker {
+        //            image "mcr.microsoft.com/dotnet/sdk:${env.DOTNET_SDK_VERSION}"
+        //        }
+        //    }
+        //    steps {
+        //        echo "Building the ASP.NET Core application (Solution: Assessment.sln)..."
+        //        sh 'dotnet build Assessment.sln --configuration Release'
+        //    }
+        //}
 
         stage('Test Application (.NET)') {
             agent {
@@ -95,7 +95,36 @@ pipeline {
                 sh 'dotnet test Assessment.sln --configuration Release --no-build'
             }
         }
-
+        stage('Test and Collect Coverage') {
+            steps {
+                // Виконуємо тести та збираємо покриття
+                // --no-build: Не перезбирати проект перед тестами (зберігає час)
+                // /p:CollectCoverage=true: Увімкнути збір покриття
+                // /p:CoverletOutputFormat=cobertura: Формат виводу Cobertura (потрібен для Jenkins Cobertura Plugin)
+                // /p:CoverletOutput=${WORKSPACE}/TestResults/coverage.xml: Шлях для збереження звіту
+                sh 'dotnet test --no-build --configuration Release /p:CollectCoverage=true /p:CoverletOutputFormat=cobertura /p:CoverletOutput=${WORKSPACE}/TestResults/coverage.xml'
+            }
+            post {
+                always {
+                    // Опціонально: архівувати результати JUnit тестів (якщо ви їх публікуєте окремо)
+                    junit '**/TestResults/*.trx' // .NET Test SDK генерує TRX файли за замовчуванням
+                }
+            }
+        }
+        stage('Publish Coverage Report') {
+            steps {
+                // Публікуємо звіт покриття за допомогою Cobertura Plugin
+                // coberturaReportFile: Шлях до згенерованого XML файлу покриття
+                // lineCoverageTargets та branchCoverageTargets: Пороги для відсотка покриття.
+                //                     Якщо покриття нижче "unhealthy", білд буде UNSTABLE.
+                //                     Якщо нижче "fail", білд буде FAILED.
+                cobertura coberturaReportFile: '**/coverage.xml',
+                          lineCoverageTargets: '80, 90, 95', // Приклад: 80% unstable, 90% healthy, 95% good
+                          branchCoverageTargets: '70, 80, 90', // Приклад для покриття гілок
+                          failUnhealthy: true, // Якщо покриття менше 80% (наш "unhealthy"), білд стане UNSTABLE
+                          failUnstable: true // Якщо покриття менше 80% (наш "unhealthy"), білд стане FAILED
+            }
+        }
         stage('Build Docker Image') {
             steps {
                 script {
