@@ -3,7 +3,7 @@ pipeline {
         // Визначаємо Docker образ для всього пайплайну
         // Це гарантує, що команда 'dotnet' буде доступна на будь-якому етапі
         docker {
-            image 'mcr.microsoft.com/dotnet/sdk:8.0' // Або 9.0, якщо ви використовуєте .NET 9 Preview
+            image 'mcr.microsoft.com/dotnet/sdk:9.0'
             args '-v $HOME/.nuget:/root/.nuget' // Дозволяє кешувати NuGet пакети поза контейнером, прискорюючи restore
         }
     }
