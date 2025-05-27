@@ -85,22 +85,16 @@ pipeline {
         }
 
 stage('Test & Coverage') {
-  agent {
-    docker { image 'mcr.microsoft.com/dotnet/sdk:9.0'; args '-u 0:0' }
-  }
-  steps {
-    sh 'dotnet test Assessment.sln --configuration Release --no-build --collect:"XPlat Code Coverage" --results-directory TestResults'
-  }
-  post {
-  success {
-    // вместо `adapters:` — `tools:`
-    recordCoverage tools: [
-      // и здесь используем фабрику адаптера Cobertura
-      coberturaAdapter('TestResults/**/coverage.cobertura.xml')
-    ]
-  }
-}
-}
+      steps {
+        script {
+          // запустить тесты и собрать cobertura-xml
+          docker.image('mcr.microsoft.com/dotnet/sdk:9.0').inside {
+            sh 'dotnet test Assessment.sln --configuration Release --no-build --collect:"XPlat Code Coverage" --results-directory TestResults'
+            sh 'reportgenerator -reports:TestResults/*/coverage.cobertura.xml -targetdir:CoverageReport -reporttypes:Cobertura'
+          }
+        }
+      }
+    }
 
         stage('Build Docker Image') {
             steps {
@@ -198,6 +192,9 @@ stage('Test & Coverage') {
         }
         success {
             echo 'Pipeline succeeded!'
+            recordCoverage tools: [
+                cobertura(pattern: 'CoverageReport/Cobertura.xml')
+            ]
         }
         failure {
             script { 
