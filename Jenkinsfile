@@ -103,9 +103,16 @@ stage('Test & Coverage') {
 
   post {
     always {
-          // use Coverage Plugin’s recordCoverage step
-          recordCoverage tools: [ cobertura('TestResults/*/coverage.cobertura.xml') ]
-        }
+      // зібрати всі .cobertura.xml у папці TestResults
+      recordCoverage(
+        tools: [[
+          parser: 'COBERTURA',
+          pattern: 'TestResults/**/coverage.cobertura.xml'
+        ]],
+        sourceCodeRetention: 'EVERY_BUILD',
+        ignoreParsingErrors: true
+      )
+    }
   }
 }
 
