@@ -2,7 +2,7 @@
 def determineDeployEnvironment(String branchName) {
     if (branchName == null || branchName.isEmpty() || branchName == "null") {
         echo "WARNING: Branch name is null or empty in determineDeployEnvironment. Defaulting to FeatureBranch."
-        return 'FeatureBranch'
+        return 'FeatureBranch' 
     }
     if (branchName == 'master' || branchName == 'main') {
         return 'Production'
@@ -28,21 +28,19 @@ def determineAspNetCoreEnvironment(String branchName) {
 }
 
 pipeline {
-    // Агент для всього пайплайну. Можна залишити 'any', оскільки специфічні стадії використовують Docker.
-    agent any
+    agent any 
 
     environment {
         APP_IMAGE_NAME = 'sessionmvc'
         DOTNET_SDK_VERSION = '9.0'
         ERROR_NOTIFICATION_EMAIL = 'solovey.itstep@gmial.com' // Ваша пошта
 
+        // Визначаємо базові змінні середовища
         GIT_BRANCH_NAME              = "${env.BRANCH_NAME}"
         DEPLOY_ENVIRONMENT           = determineDeployEnvironment(env.BRANCH_NAME)
         ASPNETCORE_ENVIRONMENT_FOR_APP = determineAspNetCoreEnvironment(env.BRANCH_NAME)
-
-        IMAGE_TAG_LATEST = null
-        IMAGE_TAG_COMMIT = null
-        IMAGE_TAG_ENV_SPECIFIC = null
+        
+        // Теги будуть повністю визначені та присвоєні env. в script блоці нижче
     }
 
     stages {
@@ -53,45 +51,24 @@ pipeline {
                     if (env.GIT_BRANCH_NAME == null || env.GIT_BRANCH_NAME.isEmpty() || env.GIT_BRANCH_NAME == "null") {
                         error "FATAL: Could not determine current Git branch. env.BRANCH_NAME was '${env.BRANCH_NAME}'"
                     }
-
+                    
                     echo "Deployment Environment: ${env.DEPLOY_ENVIRONMENT}"
                     echo "ASPNETCORE_ENVIRONMENT for application: ${env.ASPNETCORE_ENVIRONMENT_FOR_APP}"
 
                     def shortCommit = sh(script: 'git rev-parse --short HEAD', returnStdout: true).trim()
+                    // Присвоюємо значення глобальним змінним env, щоб вони були доступні на наступних етапах
                     env.IMAGE_TAG_LATEST = "${env.APP_IMAGE_NAME}:latest"
                     env.IMAGE_TAG_COMMIT = "${env.APP_IMAGE_NAME}:${shortCommit}"
-
+                    
                     if (env.DEPLOY_ENVIRONMENT != null && env.DEPLOY_ENVIRONMENT != "null") {
                         env.IMAGE_TAG_ENV_SPECIFIC = "${env.APP_IMAGE_NAME}:${env.DEPLOY_ENVIRONMENT.toLowerCase()}-${shortCommit}"
                     } else {
-                        env.IMAGE_TAG_ENV_SPECIFIC = "${env.APP_IMAGE_NAME}:unknownenv-${shortCommit}"
+                        env.IMAGE_TAG_ENV_SPECIFIC = "${env.APP_IMAGE_NAME}:unknownenv-${shortCommit}" 
                         echo "WARNING: DEPLOY_ENVIRONMENT was null or 'null' when creating IMAGE_TAG_ENV_SPECIFIC."
                     }
-
+                    
                     echo "Image tags set to: ${env.IMAGE_TAG_LATEST}, ${env.IMAGE_TAG_COMMIT}, ${env.IMAGE_TAG_ENV_SPECIFIC}"
                 }
-            }
-        }
-
-        stage('Checkout') {
-            steps {
-                git url: 'https://github.com/SoloveyItstep/Assessment.git',
-                    branch: 'master'
-            }
-        }
-
-        stage('Restore Dependencies') {
-            agent {
-                docker {
-                    image "mcr.microsoft.com/dotnet/sdk:${env.DOTNET_SDK_VERSION}"
-                    // --- ДОДАНО: Монтування NuGet кешу ---
-                    args '-v $HOME/.nuget:/root/.nuget'
-                    // ---------------------------------
-                }
-            }
-            steps {
-                echo 'Restoring NuGet packages...'
-                sh 'dotnet restore Assessment.sln'
             }
         }
 
@@ -99,48 +76,23 @@ pipeline {
             agent {
                 docker {
                     image "mcr.microsoft.com/dotnet/sdk:${env.DOTNET_SDK_VERSION}"
-                    // --- ДОДАНО: Монтування NuGet кешу ---
-                    args '-v $HOME/.nuget:/root/.nuget'
-                    // ---------------------------------
                 }
             }
             steps {
                 echo "Building the ASP.NET Core application (Solution: Assessment.sln)..."
-                sh 'dotnet build Assessment.sln --configuration Release --no-restore'
+                sh 'dotnet build Assessment.sln --configuration Release'
             }
         }
 
-        stage('Test and Collect Coverage') {
+        stage('Test Application (.NET)') {
             agent {
                 docker {
                     image "mcr.microsoft.com/dotnet/sdk:${env.DOTNET_SDK_VERSION}"
-                    // --- ДОДАНО: Монтування NuGet кешу ---
-                    args '-v $HOME/.nuget:/root/.nuget'
-                     // ---------------------------------
                 }
             }
             steps {
-                echo "Running .NET tests and collecting coverage (Solution: Assessment.sln)..."
-                // Генеруємо HTML звіт, а також Cobertura XML
-                // Використовуємо ${WORKSPACE} для абсолютної вказівки шляху
-                sh 'dotnet test Assessment.sln --configuration Release --no-build /p:CollectCoverage=true /p:CoverletOutputFormat="cobertura,html" /p:CoverletOutput=${WORKSPACE}/TestResults/ --results-directory ${WORKSPACE}/TestResults'
-            }
-        }
-
-       stage('Test and Collect Coverage') {
-            agent {
-                docker {
-                    image "mcr.microsoft.com/dotnet/sdk:${env.DOTNET_SDK_VERSION}"
-                    args '-v $HOME/.nuget:/root/.nuget'
-                }
-            }
-            steps {
-                echo "Running .NET tests and collecting coverage (Solution: Assessment.sln)..."
-                // Генеруємо **HTML** звіт, а також Cobertura XML (може знадобиться пізніше або для інших інструментів)
-                // Coverlet Output Format 'html' генерує папку з HTML файлами
-                // !!! ВИПРАВЛЕНО СИНТАКСИС /p:CoverletOutputFormat !!!
-                sh 'dotnet test Assessment.sln --configuration Release --no-build /p:CollectCoverage=true /p:CoverletOutputFormat=cobertura,html /p:CoverletOutput=${WORKSPACE}/TestResults/ --results-directory ${WORKSPACE}/TestResults'
-                // Шлях до HTML звіту буде приблизно: ${WORKSPACE}/TestResults/{GUID}/html/index.html
+                echo "Running .NET tests (Solution: Assessment.sln)..."
+                sh 'dotnet test Assessment.sln --configuration Release --no-build'
             }
         }
 
@@ -148,6 +100,7 @@ pipeline {
             steps {
                 script {
                     echo "Building Docker image with tags: ${env.IMAGE_TAG_LATEST}, ${env.IMAGE_TAG_COMMIT}, ${env.IMAGE_TAG_ENV_SPECIFIC}"
+                    // Переконуємося, що змінні не null перед використанням
                     def tagLatest = env.IMAGE_TAG_LATEST ?: "${env.APP_IMAGE_NAME}:latest-fallback"
                     def tagCommit = env.IMAGE_TAG_COMMIT ?: "${env.APP_IMAGE_NAME}:commit-fallback"
                     def tagEnvSpecific = env.IMAGE_TAG_ENV_SPECIFIC ?: "${env.APP_IMAGE_NAME}:env-fallback"
@@ -174,34 +127,38 @@ pipeline {
             steps {
                 script {
                     echo "Preparing to deploy to ${env.DEPLOY_ENVIRONMENT} environment using ASPNETCORE_ENVIRONMENT=${env.ASPNETCORE_ENVIRONMENT_FOR_APP}"
-
-                    def composeFiles = "-f docker-compose.yml"
+                    
+                    // Базовий файл завжди docker-compose.yml
+                    def composeFiles = "-f docker-compose.yml" 
+                    // Визначаємо ім'я override-файлу на основі середовища
                     def overrideFileName = (env.DEPLOY_ENVIRONMENT != null && env.DEPLOY_ENVIRONMENT != "null") ? "docker-compose.${env.DEPLOY_ENVIRONMENT.toLowerCase()}.yml" : null
-
+                    
                     if (overrideFileName != null && fileExists(overrideFileName)) {
                         composeFiles += " -f ${overrideFileName}"
                         echo "Using override file: ${overrideFileName}"
                     } else {
+                        // Логіка для випадку, коли override-файл не знайдено
                         if (env.DEPLOY_ENVIRONMENT == 'Production') {
+                             // Для Production override-файл бажаний, але якщо його немає, продовжимо з попередженням
                             echo "WARNING: Production override file ('${overrideFileName ?: 'docker-compose.production.yml'}') not found! Using only default docker-compose.yml for Production."
-                        } else if (env.DEPLOYMENT_ENVIRONMENT == 'Development') { // Виправлено опечатку DEPLOYMENT_ENVIRONMENT
-                             echo "INFO: Development override file ('${overrideFileName ?: 'docker-compose.development.yml'}') not found. Using only default docker-compose.yml for Development."
-                        } else if (env.DEPLOY_ENVIRONMENT != "null" && env.DEPLOY_ENVIRONMENT != null) {
+                        } else if (env.DEPLOY_ENVIRONMENT == 'Development') {
+                            echo "INFO: Development override file ('${overrideFileName ?: 'docker-compose.development.yml'}') not found. Using only default docker-compose.yml for Development."
+                        } else if (env.DEPLOY_ENVIRONMENT != "null" && env.DEPLOY_ENVIRONMENT != null) { // Для інших середовищ (напр. FeatureBranch)
                             echo "INFO: No specific override file for ${env.DEPLOY_ENVIRONMENT} ('${overrideFileName}'). Using only default docker-compose.yml."
-                        } else {
+                        } else { // Якщо DEPLOY_ENVIRONMENT не визначено (не повинно трапитися)
                             echo "WARNING: DEPLOY_ENVIRONMENT is null or invalid, using only default docker-compose.yml."
                         }
                     }
 
                     echo "Stopping and removing existing services (if any) using compose files: ${composeFiles}"
                     sh script: "docker-compose ${composeFiles} down --remove-orphans", returnStatus: true
-
+                    
                     echo "Deploying application using Docker Compose..."
                     sh "docker-compose --version"
-
+                    
                     echo "Executing: docker-compose ${composeFiles} up -d --build sessionmvc"
                     sh "docker-compose ${composeFiles} up -d --build sessionmvc"
-
+                    
                     echo "To check logs after deploy, run: docker-compose ${composeFiles} logs --tail=50 sessionmvc"
                 }
             }
@@ -226,24 +183,23 @@ pipeline {
 
     post {
         always {
-            script {
+            script { 
                 def finalBranchName = env.GIT_BRANCH_NAME ?: "unknown_branch (was null)"
                 def finalDeployEnv = env.DEPLOY_ENVIRONMENT ?: "unknown_environment (was null)"
                 echo "Pipeline finished for branch ${finalBranchName} and environment ${finalDeployEnv}."
             }
-            // cleanWs()
+            cleanWs() 
         }
         success {
             echo 'Pipeline succeeded!'
         }
         failure {
-            script {
+            script { 
                 def finalBranchName = env.GIT_BRANCH_NAME ?: "unknown_branch (was null)"
                 def finalDeployEnv = env.DEPLOY_ENVIRONMENT ?: "unknown_environment (was null)"
                 echo 'Pipeline failed!'
-                // Виправлено опечатку в перевірці email адреси
-                if (env.ERROR_NOTIFICATION_EMAIL && env.ERROR_NOTIFICATION_EMAIL != 'solovey.itstep@gmail.com') {
-                     mail to: "${env.ERROR_NOTIFICATION_EMAIL}",
+                if (env.ERROR_NOTIFICATION_EMAIL && env.ERROR_NOTIFICATION_EMAIL != 'your-email@example.com') { // Перевіряємо, чи email змінено з дефолтного
+                    mail to: "${env.ERROR_NOTIFICATION_EMAIL}",
                          subject: "FAILURE: Pipeline ${env.JOB_NAME} - Build #${env.BUILD_NUMBER} [${finalDeployEnv}]",
                          body: """Pipeline ${env.JOB_NAME} - Build #${env.BUILD_NUMBER} for environment ${finalDeployEnv} on branch ${finalBranchName} failed.
 Check console output for more details: ${env.BUILD_URL}console"""
