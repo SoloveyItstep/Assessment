@@ -86,25 +86,23 @@ pipeline {
 
 stage('Test Application (.NET)') {
     agent {
-        docker {
-            image "mcr.microsoft.com/dotnet/sdk:${env.DOTNET_SDK_VERSION}"
-        }
+        docker { image "mcr.microsoft.com/dotnet/sdk:${env.DOTNET_SDK_VERSION}" }
     }
     steps {
         echo "Running .NET tests for Assessment.sln with coverage..."
         sh '''
             dotnet test Assessment.sln \
-              --configuration Release \
-              --no-build \
-              --collect:"XPlat Code Coverage"
+                --configuration Release \
+                --no-build \
+                --collect:"XPlat Code Coverage"
         '''
     }
     post {
         always {
-            // публікуємо coverage у форматі Cobertura
-            publishCoverage adapters: [
-                coberturaAdapter('**/TestResults/*/coverage.cobertura.xml')
-            ], sourceFileResolver: sourceFiles('**/Session/**/*.cs')
+            // замість publishCoverage — використовуємо recordCoverage
+            recordCoverage tools: [
+                cobertura(pattern: '**/TestResults/*/coverage.cobertura.xml')
+            ]
         }
     }
 }
