@@ -84,24 +84,27 @@ pipeline {
             }
         }
 
-        stage('Test Application (.NET)') {
-            agent {
-                docker {
-                    image "mcr.microsoft.com/dotnet/sdk:${env.DOTNET_SDK_VERSION}"
-                }
-            }
-            steps {
-                echo "Running .NET tests (Solution: Assessment.sln)..."
-                //sh 'dotnet test Assessment.sln --configuration Release --no-build'
-                // Collect code coverage via Coverlet
-                sh '''
-                  dotnet test \
-                    --configuration Release \
-                    --no-build \
-                    --collect:"XPlat Code Coverage"
-                '''
-            }
-        }
+stage('Test & Coverage') {
+  steps {
+    sh '''
+      dotnet test Assessment.sln \
+        --configuration Release \
+        --no-build \
+        --collect:"XPlat Code Coverage" \
+        --results-directory TestResults
+    '''
+  }
+  post {
+    success {
+      recordCoverage tools: [[
+        parser: 'Cobertura',
+        pattern: 'TestResults/*/coverage.cobertura.xml'
+      ]]
+    }
+  }
+}
+
+
 
         stage('Build Docker Image') {
             steps {
