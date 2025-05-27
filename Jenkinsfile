@@ -89,30 +89,56 @@ pipeline {
             }
         }
 
-stage('Test Application (.NET)') {
-    agent {
-        docker { image "mcr.microsoft.com/dotnet/sdk:${env.DOTNET_SDK_VERSION}" }
+stage('Test & Coverage') {
+  agent {
+    docker {
+      image "mcr.microsoft.com/dotnet/sdk:${env.DOTNET_SDK_VERSION}"
     }
-    steps {
-        echo "Running .NET tests for Assessment.sln with coverage..."
-        sh '''
-          dotnet test Assessment.sln \
-            --configuration Release \
-            --no-build \
-            --collect:"XPlat Code Coverage"
+  }
+  steps {
+    echo "1) Запускаємо тести з Coverlet…"
+    sh '''
+      set -e
 
-          # Встановлюємо ReportGenerator (перший раз може трохи довше)
-          dotnet tool install --global dotnet-reportgenerator-globaltool --version 4.8.12
-          export PATH="$PATH:$HOME/.dotnet/tools"
+      # 1) Тести з XPlat Code Coverage (quotes обовʼязкові!)
+      dotnet test Assessment.sln \
+        --configuration Release \
+        --no-build \
+        --collect:"XPlat Code Coverage" \
+        --results-directory "TestResults"
 
-          # Генеруємо текстовий підсумок покриття:
-          reportgenerator \
-            "-reports:**/TestResults/*/coverage.cobertura.xml" \
-            "-targetdir:CoverageReport" \
-            "-reporttypes:TextSummary"
-        '''
+      # 2) Перевіримо, що Coverage файл дійсно зʼявився
+      echo "=== Списoк файлів у TestResults ==="
+      find TestResults -type f -print
+
+      # 3) Встановлюємо ReportGenerator (якщо ще не встановлений)
+      dotnet tool install --global dotnet-reportgenerator-globaltool --version 4.8.12 \
+        || true    # ігнорувати помилку, якщо вже є
+      export PATH="$PATH:/root/.dotnet/tools"
+
+      # 4) Генеруємо TextSummary
+      reportgenerator \
+        "-reports:TestResults/*/coverage.cobertura.xml" \
+        "-targetdir:CoverageReport" \
+        "-reporttypes:TextSummary"
+    '''
+  }
+
+  post {
+    always {
+      // Якщо хочете – опублікувати HTML-версію у Jenkins через стандартний HTML Publisher:
+      publishHTML target: [
+        allowMissing: true,
+        alwaysLinkToLastBuild: true,
+        keepAll: true,
+        reportDir: 'CoverageReport',
+        reportFiles: 'index.html',
+        reportName: 'Coverage Report'
+      ]
     }
+  }
 }
+
 
         stage('Build Docker Image') {
             steps {
