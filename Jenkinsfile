@@ -98,6 +98,9 @@ stage('Test & Coverage') {
             --no-build \
             --collect:"XPlat Code Coverage" \
             --results-directory TestResults
+
+            echo "=== Вміст TestResults ==="
+            ls -R TestResults
         '''
   }
 
