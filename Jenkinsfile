@@ -87,10 +87,14 @@ pipeline {
 stage('Test & Coverage') {
       steps {
         script {
-          // запустить тесты и собрать cobertura-xml
           docker.image('mcr.microsoft.com/dotnet/sdk:9.0').inside {
-            sh 'dotnet test Assessment.sln --configuration Release --no-build --collect:"XPlat Code Coverage" --results-directory TestResults'
-            sh 'reportgenerator -reports:TestResults/*/coverage.cobertura.xml -targetdir:CoverageReport -reporttypes:Cobertura'
+            sh '''\
+              dotnet test Assessment.sln \
+                --configuration Release \
+                --no-build \
+                --collect:"XPlat Code Coverage" \
+                --results-directory TestResults
+            '''.stripIndent()
           }
         }
       }
@@ -193,8 +197,8 @@ stage('Test & Coverage') {
         success {
             echo 'Pipeline succeeded!'
             recordCoverage tools: [
-                cobertura(pattern: 'CoverageReport/Cobertura.xml')
-            ]
+                cobertura(pattern: 'TestResults/*/coverage.cobertura.xml')
+          ]
         }
         failure {
             script { 
