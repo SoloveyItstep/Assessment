@@ -46,21 +46,25 @@ pipeline {
         stage('Test and Collect Coverage') {
             steps {
                 echo "Running .NET tests and collecting coverage (Solution: Assessment.sln)..."
-                // *** ЗМІНА ТУТ ***
-                // Вказуємо шлях до файлу рішення
+                // Виконуємо тести, збираємо покриття та генеруємо JUnit XML звіт
                 sh 'dotnet test Assessment.sln ' +
                    '--configuration Release ' +
                    '--no-build ' +
                    '/p:CollectCoverage=true ' +
                    '/p:CoverletOutputFormat=cobertura ' +
-                   '/p:CoverletOutput=${WORKSPACE}/TestResults/coverage.xml'
+                   '/p:CoverletOutput=${WORKSPACE}/TestResults/coverage.xml ' +
+                   // *** ЗМІНА ТУТ: Додаємо VSTestLogger для генерації JUnit XML ***
+                   '/p:VSTestLogger="junit;LogFileName=junit.xml" ' + // Генерує junit.xml
+                   // *** Опціонально: Вказуємо директорію для результатів тестування ***
+                   '--results-directory "${WORKSPACE}/TestResults"' // Всі результати (TRX, JUnit XML) будуть тут
             }
             post {
                 always {
-                    // Переконайтеся, що цей шлях коректний для ваших звітів JUnit
-                    // Якщо тести запускаються на рівні рішення, TRX файли можуть бути глибше.
-                    // '**/TestResults/**/*.trx' - це гарний варіант, який шукає TRX у всіх піддиректоріях TestResults
-                    junit '**/TestResults/**/*.trx'
+                    // *** ЗМІНА ТУТ: Шукаємо конкретно згенерований junit.xml ***
+                    // JUnit плагін шукає файли за маскою.
+                    // Так як VSTestLogger генерує junit.xml всередині GUID-папки
+                    // в TestResults, то '**/TestResults/**/junit.xml' є коректною маскою.
+                    junit '**/TestResults/**/junit.xml'
                 }
             }
         }
