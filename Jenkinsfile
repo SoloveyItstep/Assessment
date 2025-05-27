@@ -47,6 +47,17 @@ pipeline {
             steps {
                 echo "Running .NET tests and collecting coverage (Solution: Assessment.sln)..."
                 // Виконуємо тести, збираємо покриття та генеруємо JUnit XML звіт
+                        sh 'dotnet test Assessment.sln ' +
+           '--configuration Release ' +
+           '--no-build ' +
+           '/p:CollectCoverage=true ' +
+           '/p:CoverletOutputFormat=cobertura ' +
+           '/p:CoverletOutput=${WORKSPACE}/TestResults/coverage.xml ' +
+           '/p:VSTestLogger="junit;LogFileName=junit.xml" ' +
+           '--results-directory "${WORKSPACE}/TestResults"'
+
+        echo "Listing contents of TestResults directory:"
+        sh "ls -R ${WORKSPACE}/TestResults" // Додайте цей рядок для відлагодження
                 sh 'dotnet test Assessment.sln ' +
                    '--configuration Release ' +
                    '--no-build ' +
