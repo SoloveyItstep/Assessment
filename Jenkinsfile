@@ -92,12 +92,14 @@ stage('Test & Coverage') {
     sh 'dotnet test Assessment.sln --configuration Release --no-build --collect:"XPlat Code Coverage" --results-directory TestResults'
   }
   post {
-    success {
-      recordCoverage adapters: [
-        coberturaAdapter('TestResults/**/coverage.cobertura.xml')
-      ]
-    }
+  success {
+    // вместо `adapters:` — `tools:`
+    recordCoverage tools: [
+      // и здесь используем фабрику адаптера Cobertura
+      coberturaAdapter('TestResults/**/coverage.cobertura.xml')
+    ]
   }
+}
 }
 
         stage('Build Docker Image') {
