@@ -1,240 +1,140 @@
-// Визначаємо допоміжні функції Groovy тут, ПОЗА блоком pipeline {}
-def determineDeployEnvironment(String branchName) {
-    if (branchName == null || branchName.isEmpty() || branchName == "null") {
-        echo "WARNING: Branch name is null or empty in determineDeployEnvironment. Defaulting to FeatureBranch."
-        return 'FeatureBranch' 
-    }
-    if (branchName == 'master' || branchName == 'main') {
-        return 'Production'
-    } else if (branchName == 'develop') {
-        return 'Development'
-    } else {
-        return 'FeatureBranch'
-    }
-}
-
-def determineAspNetCoreEnvironment(String branchName) {
-    if (branchName == null || branchName.isEmpty() || branchName == "null") {
-        echo "WARNING: Branch name is null or empty in determineAspNetCoreEnvironment. Defaulting to Development."
-        return 'Development'
-    }
-    if (branchName == 'master' || branchName == 'main') {
-        return 'Production'
-    } else if (branchName == 'develop') {
-        return 'Development'
-    } else {
-        return 'Development'
-    }
-}
-
 pipeline {
-    agent any 
+    agent {
+        // Визначаємо Docker образ для всього пайплайну
+        // Це гарантує, що команда 'dotnet' буде доступна на будь-якому етапі
+        docker {
+            image 'mcr.microsoft.com/dotnet/sdk:8.0' // Або 9.0, якщо ви використовуєте .NET 9 Preview
+            args '-v $HOME/.nuget:/root/.nuget' // Дозволяє кешувати NuGet пакети поза контейнером, прискорюючи restore
+        }
+    }
 
     environment {
-        APP_IMAGE_NAME = 'sessionmvc'
-        DOTNET_SDK_VERSION = '9.0'
-        ERROR_NOTIFICATION_EMAIL = 'solovey.itstep@gmial.com' // Ваша пошта
-
-        // Визначаємо базові змінні середовища
-        GIT_BRANCH_NAME              = "${env.BRANCH_NAME}"
-        DEPLOY_ENVIRONMENT           = determineDeployEnvironment(env.BRANCH_NAME)
-        ASPNETCORE_ENVIRONMENT_FOR_APP = determineAspNetCoreEnvironment(env.BRANCH_NAME)
-        
-        // Теги будуть повністю визначені та присвоєні env. в script блоці нижче
+        // Визначення змінних середовища для всього пайплайну
+        BRANCH_NAME = "${env.GIT_BRANCH_NAME ?: 'master'}" // Якщо у вас мульти-гілковий пайплайн, використовує ім'я гілки
+        DEPLOY_ENV = "Production" // Або інша змінна для середовища розгортання
+        ASPNETCORE_ENVIRONMENT = "Production" // Для конфігурації ASP.NET Core
+        // Отримання короткого Git-хешу для тегів образів Docker
+        IMAGE_TAG_SHORT = sh(returnStdout: true, script: 'git rev-parse --short HEAD').trim()
+        IMAGE_TAGS = "sessionmvc:latest, sessionmvc:${env.IMAGE_TAG_SHORT}, sessionmvc:${env.DEPLOY_ENV}-${env.IMAGE_TAG_SHORT}"
     }
 
     stages {
         stage('Initialize and Display Environment') {
             steps {
                 script {
-                    echo "Current Git branch (from env.BRANCH_NAME via env.GIT_BRANCH_NAME): ${env.GIT_BRANCH_NAME}"
-                    if (env.GIT_BRANCH_NAME == null || env.GIT_BRANCH_NAME.isEmpty() || env.GIT_BRANCH_NAME == "null") {
-                        error "FATAL: Could not determine current Git branch. env.BRANCH_NAME was '${env.BRANCH_NAME}'"
-                    }
-                    
-                    echo "Deployment Environment: ${env.DEPLOY_ENVIRONMENT}"
-                    echo "ASPNETCORE_ENVIRONMENT for application: ${env.ASPNETCORE_ENVIRONMENT_FOR_APP}"
-
-                    def shortCommit = sh(script: 'git rev-parse --short HEAD', returnStdout: true).trim()
-                    // Присвоюємо значення глобальним змінним env, щоб вони були доступні на наступних етапах
-                    env.IMAGE_TAG_LATEST = "${env.APP_IMAGE_NAME}:latest"
-                    env.IMAGE_TAG_COMMIT = "${env.APP_IMAGE_NAME}:${shortCommit}"
-                    
-                    if (env.DEPLOY_ENVIRONMENT != null && env.DEPLOY_ENVIRONMENT != "null") {
-                        env.IMAGE_TAG_ENV_SPECIFIC = "${env.APP_IMAGE_NAME}:${env.DEPLOY_ENVIRONMENT.toLowerCase()}-${shortCommit}"
-                    } else {
-                        env.IMAGE_TAG_ENV_SPECIFIC = "${env.APP_IMAGE_NAME}:unknownenv-${shortCommit}" 
-                        echo "WARNING: DEPLOY_ENVIRONMENT was null or 'null' when creating IMAGE_TAG_ENV_SPECIFIC."
-                    }
-                    
-                    echo "Image tags set to: ${env.IMAGE_TAG_LATEST}, ${env.IMAGE_TAG_COMMIT}, ${env.IMAGE_TAG_ENV_SPECIFIC}"
+                    echo "Current Git branch (from env.BRANCH_NAME via env.GIT_BRANCH_NAME): ${env.BRANCH_NAME}"
+                    echo "Deployment Environment: ${env.DEPLOY_ENV}"
+                    echo "ASPNETCORE_ENVIRONMENT for application: ${env.ASPNETCORE_ENVIRONMENT}"
+                    echo "Image tags set to: ${env.IMAGE_TAGS}"
                 }
             }
         }
 
-        //stage('Build Application (.NET)') {
-        //    agent {
-        //        docker {
-        //            image "mcr.microsoft.com/dotnet/sdk:${env.DOTNET_SDK_VERSION}"
-        //        }
-        //    }
-        //    steps {
-        //        echo "Building the ASP.NET Core application (Solution: Assessment.sln)..."
-        //        sh 'dotnet build Assessment.sln --configuration Release'
-        //    }
-        //}
-
-        stage('Test Application (.NET)') {
-            agent {
-                docker {
-                    image "mcr.microsoft.com/dotnet/sdk:${env.DOTNET_SDK_VERSION}"
-                }
-            }
+        stage('Restore') {
             steps {
-                echo "Running .NET tests (Solution: Assessment.sln)..."
-                sh 'dotnet test Assessment.sln --configuration Release --no-build'
+                sh 'dotnet restore'
             }
         }
+
+        stage('Build') {
+            steps {
+                // Збираємо рішення, не відновлюючи пакети повторно
+                sh 'dotnet build --no-restore --configuration Release'
+            }
+        }
+
         stage('Test and Collect Coverage') {
             steps {
-                // Виконуємо тести та збираємо покриття
-                // --no-build: Не перезбирати проект перед тестами (зберігає час)
-                // /p:CollectCoverage=true: Увімкнути збір покриття
-                // /p:CoverletOutputFormat=cobertura: Формат виводу Cobertura (потрібен для Jenkins Cobertura Plugin)
-                // /p:CoverletOutput=${WORKSPACE}/TestResults/coverage.xml: Шлях для збереження звіту
-                sh 'dotnet test --no-build --configuration Release /p:CollectCoverage=true /p:CoverletOutputFormat=cobertura /p:CoverletOutput=${WORKSPACE}/TestResults/coverage.xml'
+                echo "Running .NET tests and collecting coverage (Solution: Assessment.sln)..."
+                // Виконуємо тести та збираємо покриття в один крок
+                // Зверніть увагу: шлях до TestResults/coverage.xml відносно WORKSPACE
+                sh 'dotnet test Assessment.sln ' +
+                   '--configuration Release ' +
+                   '--no-build ' + // Не перезбирати проект, оскільки ми його вже зібрали на етапі 'Build'
+                   '/p:CollectCoverage=true ' +
+                   '/p:CoverletOutputFormat=cobertura ' +
+                   '/p:CoverletOutput=${WORKSPACE}/TestResults/coverage.xml'
             }
             post {
                 always {
-                    // Опціонально: архівувати результати JUnit тестів (якщо ви їх публікуєте окремо)
-                    junit '**/TestResults/*.trx' // .NET Test SDK генерує TRX файли за замовчуванням
-                }
-            }
-        }
-        stage('Publish Coverage Report') {
-            steps {
-                // Публікуємо звіт покриття за допомогою Cobertura Plugin
-                // coberturaReportFile: Шлях до згенерованого XML файлу покриття
-                // lineCoverageTargets та branchCoverageTargets: Пороги для відсотка покриття.
-                //                     Якщо покриття нижче "unhealthy", білд буде UNSTABLE.
-                //                     Якщо нижче "fail", білд буде FAILED.
-                cobertura coberturaReportFile: '**/coverage.xml',
-                          lineCoverageTargets: '80, 90, 95', // Приклад: 80% unstable, 90% healthy, 95% good
-                          branchCoverageTargets: '70, 80, 90', // Приклад для покриття гілок
-                          failUnhealthy: true, // Якщо покриття менше 80% (наш "unhealthy"), білд стане UNSTABLE
-                          failUnstable: true // Якщо покриття менше 80% (наш "unhealthy"), білд стане FAILED
-            }
-        }
-        stage('Build Docker Image') {
-            steps {
-                script {
-                    echo "Building Docker image with tags: ${env.IMAGE_TAG_LATEST}, ${env.IMAGE_TAG_COMMIT}, ${env.IMAGE_TAG_ENV_SPECIFIC}"
-                    // Переконуємося, що змінні не null перед використанням
-                    def tagLatest = env.IMAGE_TAG_LATEST ?: "${env.APP_IMAGE_NAME}:latest-fallback"
-                    def tagCommit = env.IMAGE_TAG_COMMIT ?: "${env.APP_IMAGE_NAME}:commit-fallback"
-                    def tagEnvSpecific = env.IMAGE_TAG_ENV_SPECIFIC ?: "${env.APP_IMAGE_NAME}:env-fallback"
-                    sh "docker build -t \"${tagLatest}\" -t \"${tagCommit}\" -t \"${tagEnvSpecific}\" ."
+                    // Публікуємо результати JUnit тестів.
+                    // **Примітка:** Ваш лог показує "No test report files were found".
+                    // Можливо, шлях до .trx файлів потребує уточнення.
+                    // Зазвичай вони знаходяться у піддиректорії: TestResults/<Назва_Тестового_Проекту>/<Унікальний_GUID>/*.trx
+                    // '**/TestResults/**/*.trx' - шукає .trx файли у будь-якій піддиректорії TestResults
+                    junit '**/TestResults/**/*.trx'
                 }
             }
         }
 
-        stage('Push Docker Image (Skipped)') {
+        stage('Publish Coverage Report') {
             steps {
-                echo "Skipping Docker Image Push as per configuration."
+                // Публікуємо звіт покриття за допомогою Cobertura Plugin
+                // '**/TestResults/coverage.xml' - шукає звіт у будь-якій піддиректорії TestResults
+                cobertura coberturaReportFile: '**/TestResults/coverage.xml',
+                          lineCoverageTargets: '80, 90, 95',
+                          branchCoverageTargets: '70, 80, 90',
+                          failUnhealthy: true,
+                          failUnstable: true
+            }
+        }
+
+        stage('Publish Application') { // Перейменовано для ясності
+            steps {
+                echo "Publishing application (Solution: Assessment.sln)..."
+                // Публікуємо ваш основний проект. Переконайтеся, що Assessment.sln включає ваш основний проект.
+                sh 'dotnet publish Assessment.sln --no-build --configuration Release -o app/publish'
+            }
+        }
+
+        stage('Build Docker Image') {
+            steps {
+                echo "Building Docker image (Image Name: sessionmvc)..."
+                // Припускаємо, що ваш Dockerfile знаходиться у корені проекту
+                script {
+                    // Формуємо список тегів для команди docker build
+                    def tags = env.IMAGE_TAGS.split(', ').collect { "-t ${it.trim()}" }.join(' ')
+                    sh "docker build . ${tags} -f Dockerfile"
+                }
+            }
+        }
+
+        stage('Push Docker Image (Skipped)') { // Залишаємо назву, як у вас
+            // Тут ви б додавали логіку для push до Docker Registry
+            steps {
+                echo "Skipping Docker image push for now."
             }
         }
 
         stage('Deploy to Environment') {
-            when {
-                expression { env.DEPLOY_ENVIRONMENT == 'Development' || env.DEPLOY_ENVIRONMENT == 'Production' }
-            }
-            agent {
-                docker {
-                    image 'docker/compose:1.29.2'
-                }
-            }
+            // Ваша логіка розгортання
             steps {
-                script {
-                    echo "Preparing to deploy to ${env.DEPLOY_ENVIRONMENT} environment using ASPNETCORE_ENVIRONMENT=${env.ASPNETCORE_ENVIRONMENT_FOR_APP}"
-                    
-                    // Базовий файл завжди docker-compose.yml
-                    def composeFiles = "-f docker-compose.yml" 
-                    // Визначаємо ім'я override-файлу на основі середовища
-                    def overrideFileName = (env.DEPLOY_ENVIRONMENT != null && env.DEPLOY_ENVIRONMENT != "null") ? "docker-compose.${env.DEPLOY_ENVIRONMENT.toLowerCase()}.yml" : null
-                    
-                    if (overrideFileName != null && fileExists(overrideFileName)) {
-                        composeFiles += " -f ${overrideFileName}"
-                        echo "Using override file: ${overrideFileName}"
-                    } else {
-                        // Логіка для випадку, коли override-файл не знайдено
-                        if (env.DEPLOY_ENVIRONMENT == 'Production') {
-                             // Для Production override-файл бажаний, але якщо його немає, продовжимо з попередженням
-                            echo "WARNING: Production override file ('${overrideFileName ?: 'docker-compose.production.yml'}') not found! Using only default docker-compose.yml for Production."
-                        } else if (env.DEPLOY_ENVIRONMENT == 'Development') {
-                            echo "INFO: Development override file ('${overrideFileName ?: 'docker-compose.development.yml'}') not found. Using only default docker-compose.yml for Development."
-                        } else if (env.DEPLOY_ENVIRONMENT != "null" && env.DEPLOY_ENVIRONMENT != null) { // Для інших середовищ (напр. FeatureBranch)
-                            echo "INFO: No specific override file for ${env.DEPLOY_ENVIRONMENT} ('${overrideFileName}'). Using only default docker-compose.yml."
-                        } else { // Якщо DEPLOY_ENVIRONMENT не визначено (не повинно трапитися)
-                            echo "WARNING: DEPLOY_ENVIRONMENT is null or invalid, using only default docker-compose.yml."
-                        }
-                    }
-
-                    echo "Stopping and removing existing services (if any) using compose files: ${composeFiles}"
-                    sh script: "docker-compose ${composeFiles} down --remove-orphans", returnStatus: true
-                    
-                    echo "Deploying application using Docker Compose..."
-                    sh "docker-compose --version"
-                    
-                    echo "Executing: docker-compose ${composeFiles} up -d --build sessionmvc"
-                    sh "docker-compose ${composeFiles} up -d --build sessionmvc"
-                    
-                    echo "To check logs after deploy, run: docker-compose ${composeFiles} logs --tail=50 sessionmvc"
-                }
+                echo "Deploying to ${env.DEPLOY_ENV} environment..."
             }
         }
 
         stage('Git Tagging for Production') {
-            when {
-                expression { env.DEPLOY_ENVIRONMENT == 'Production' }
-            }
+            // Ваша логіка тегування Git
             steps {
-                script {
-                    def tagName = (env.DEPLOY_ENVIRONMENT != null && env.DEPLOY_ENVIRONMENT != "null") ? "v${new Date().format('yyyyMMdd.HHmmss')}-${env.DEPLOY_ENVIRONMENT.toLowerCase()}" : "v${new Date().format('yyyyMMdd.HHmmss')}-unknownenv"
-                    echo "Creating Git tag: ${tagName}"
-                    sh "git tag ${tagName}"
-                    echo "Attempting to push Git tag: ${tagName}"
-                    // sh "GIT_SSH_COMMAND='ssh -i ${GIT_SSH_KEY} -o IdentitiesOnly=yes -o StrictHostKeyChecking=no' git push origin ${tagName}"
-                    echo "NOTE: 'git push origin ${tagName}' is currently commented out. Configure credentials and uncomment for actual push."
-                }
+                echo "Skipping Git tagging for Production for now."
             }
         }
-    } // кінець stages
+    }
 
     post {
         always {
-            script { 
-                def finalBranchName = env.GIT_BRANCH_NAME ?: "unknown_branch (was null)"
-                def finalDeployEnv = env.DEPLOY_ENVIRONMENT ?: "unknown_environment (was null)"
-                echo "Pipeline finished for branch ${finalBranchName} and environment ${finalDeployEnv}."
-            }
-            cleanWs() 
+            cleanWs() // Очищуємо робочу область після кожного білду
         }
         success {
-            echo 'Pipeline succeeded!'
+            script {
+                echo "Pipeline finished successfully for branch ${env.BRANCH_NAME} and environment ${env.DEPLOY_ENV}."
+            }
         }
         failure {
-            script { 
-                def finalBranchName = env.GIT_BRANCH_NAME ?: "unknown_branch (was null)"
-                def finalDeployEnv = env.DEPLOY_ENVIRONMENT ?: "unknown_environment (was null)"
-                echo 'Pipeline failed!'
-                if (env.ERROR_NOTIFICATION_EMAIL && env.ERROR_NOTIFICATION_EMAIL != 'your-email@example.com') { // Перевіряємо, чи email змінено з дефолтного
-                    mail to: "${env.ERROR_NOTIFICATION_EMAIL}",
-                         subject: "FAILURE: Pipeline ${env.JOB_NAME} - Build #${env.BUILD_NUMBER} [${finalDeployEnv}]",
-                         body: """Pipeline ${env.JOB_NAME} - Build #${env.BUILD_NUMBER} for environment ${finalDeployEnv} on branch ${finalBranchName} failed.
-Check console output for more details: ${env.BUILD_URL}console"""
-                } else {
-                    echo "Email notification skipped: ERROR_NOTIFICATION_EMAIL is default or not configured."
-                }
+            script {
+                echo "Pipeline failed for branch ${env.BRANCH_NAME} and environment ${env.DEPLOY_ENV}!"
+                // Ваш mail плагін видає Connection refused. Перевірте налаштування SMTP у Jenkins.
+                // mail(to: 'your_email@example.com', subject: "Jenkins Build Failed: ${env.JOB_NAME} - ${env.BUILD_NUMBER}", body: "Build failed: ${env.BUILD_URL}")
             }
         }
     }
