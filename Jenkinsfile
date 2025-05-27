@@ -127,30 +127,20 @@ pipeline {
             }
         }
 
-        stage('Publish HTML Coverage Report') {
-             agent any // Ця стадія може виконуватися на будь-якому агентові
-            steps {
-                echo 'Publishing HTML Coverage Report...'
-                script {
-                    def htmlReportDirs = findFiles(glob: 'TestResults/**/html', allowEmpty: true)
-
-                    if (htmlReportDirs.length > 0) {
-                        echo "Знайдено HTML директорію звіту: ${htmlReportDirs[0].path}"
-                        publishHTML(
-                            target: [
-                                allowMissing         : false,
-                                alwaysPublishFromMaster: false,
-                                keepAll              : true,
-                                reportDir            : htmlReportDirs[0].path,
-                                reportFiles          : 'index.html',
-                                reportName           : 'Code Coverage Report',
-                                allowEmptyReport     : false
-                            ]
-                        )
-                    } else {
-                        echo "Попередження: HTML директорія звіту покриття не знайдена! Не можу опублікувати звіт."
-                    }
+       stage('Test and Collect Coverage') {
+            agent {
+                docker {
+                    image "mcr.microsoft.com/dotnet/sdk:${env.DOTNET_SDK_VERSION}"
+                    args '-v $HOME/.nuget:/root/.nuget'
                 }
+            }
+            steps {
+                echo "Running .NET tests and collecting coverage (Solution: Assessment.sln)..."
+                // Генеруємо **HTML** звіт, а також Cobertura XML (може знадобиться пізніше або для інших інструментів)
+                // Coverlet Output Format 'html' генерує папку з HTML файлами
+                // !!! ВИПРАВЛЕНО СИНТАКСИС /p:CoverletOutputFormat !!!
+                sh 'dotnet test Assessment.sln --configuration Release --no-build /p:CollectCoverage=true /p:CoverletOutputFormat=cobertura,html /p:CoverletOutput=${WORKSPACE}/TestResults/ --results-directory ${WORKSPACE}/TestResults'
+                // Шлях до HTML звіту буде приблизно: ${WORKSPACE}/TestResults/{GUID}/html/index.html
             }
         }
 
