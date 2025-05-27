@@ -101,13 +101,12 @@ stage('Test & Coverage') {
         '''
       }
       post {
-        success {
-          recordCoverage tools: [[
-            parser : 'Cobertura',
-            pattern: 'TestResults/**/coverage.cobertura.xml'
-          ]]
-        }
-      }
+  success {
+    recordCoverage adapters: [
+      coberturaAdapter('TestResults/**/coverage.cobertura.xml')
+    ]
+  }
+}
     }
 
 
