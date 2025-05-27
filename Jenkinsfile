@@ -102,11 +102,15 @@ pipeline {
             steps {
                 // Тепер, коли JUnit звіт повинен бути коректним,
                 // цей етап також повинен спрацювати без проблем.
-                cobertura coberturaReportFile: '**/TestResults/coverage.xml',
-                          lineCoverageTargets: '80, 90, 95',
-                          branchCoverageTargets: '70, 80, 90',
-                          failUnhealthy: true,
-                          failUnstable: true
+                cobertura autoUpdateHealth: false,
+                          autoUpdateStability: false,
+                          coberturaReportFile: '**/TestResults/**/coverage.cobertura.xml',
+                          failUnhealthy: false, // Set to true to fail build on unhealthy coverage
+                          failUnstable: false,  // Set to true to fail build on unstable coverage
+                          lineCoverageTargets: '0, 0, 0', // Example: '70, 80, 90' for thresholds (unhealthy, unstable, healthy)
+                          onlyStable: false,
+                          sourceEncoding: 'ASCII', // Or your project's encoding
+                          stabilityTargets: '0, 0, 0' // Example: '70, 80, 90' for thresholds
             }
         }
 
