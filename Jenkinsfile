@@ -28,6 +28,7 @@ def determineAspNetCoreEnvironment(String branchName) {
 }
 
 pipeline {
+    // Агент для всього пайплайну. Можна залишити 'any', оскільки специфічні стадії використовують Docker.
     agent any
 
     environment {
@@ -83,6 +84,9 @@ pipeline {
             agent {
                 docker {
                     image "mcr.microsoft.com/dotnet/sdk:${env.DOTNET_SDK_VERSION}"
+                    // --- ДОДАНО: Монтування NuGet кешу ---
+                    args '-v $HOME/.nuget:/root/.nuget'
+                    // ---------------------------------
                 }
             }
             steps {
@@ -95,6 +99,9 @@ pipeline {
             agent {
                 docker {
                     image "mcr.microsoft.com/dotnet/sdk:${env.DOTNET_SDK_VERSION}"
+                    // --- ДОДАНО: Монтування NuGet кешу ---
+                    args '-v $HOME/.nuget:/root/.nuget'
+                    // ---------------------------------
                 }
             }
             steps {
@@ -107,55 +114,45 @@ pipeline {
             agent {
                 docker {
                     image "mcr.microsoft.com/dotnet/sdk:${env.DOTNET_SDK_VERSION}"
+                    // --- ДОДАНО: Монтування NuGet кешу ---
+                    args '-v $HOME/.nuget:/root/.nuget'
+                     // ---------------------------------
                 }
             }
             steps {
                 echo "Running .NET tests and collecting coverage (Solution: Assessment.sln)..."
-                // Генеруємо **HTML** звіт, а також Cobertura XML (може знадобиться пізніше або для інших інструментів)
-                // Coverlet Output Format 'html' генерує папку з HTML файлами
+                // Генеруємо HTML звіт, а також Cobertura XML
+                // Використовуємо ${WORKSPACE} для абсолютної вказівки шляху
                 sh 'dotnet test Assessment.sln --configuration Release --no-build /p:CollectCoverage=true /p:CoverletOutputFormat="cobertura,html" /p:CoverletOutput=${WORKSPACE}/TestResults/ --results-directory ${WORKSPACE}/TestResults'
-                // Шлях до HTML звіту буде приблизно: ${WORKSPACE}/TestResults/{GUID}/html/index.html
-                // Або просто ${WORKSPACE}/TestResults/html/index.html залежно від версії Coverlet та параметрів.
-                // Ми будемо шукати папку `html` за допомогою патерну.
             }
         }
 
-        // --- НОВА СТАДІЯ ДЛЯ ПУБЛІКАЦІЇ HTML ЗВІТУ ---
         stage('Publish HTML Coverage Report') {
-             // Ця стадія може виконуватися на будь-якому агентові, де встановлено HTML Publisher Plugin
-             agent any
+             agent any // Ця стадія може виконуватися на будь-якому агентові
             steps {
                 echo 'Publishing HTML Coverage Report...'
                 script {
-                    // Шукаємо директорію з HTML звітом. Coverlet зазвичай створює папку 'html'
-                    // в директорії результатів, часто всередині папки з GUID.
-                    // Використовуємо Ant glob патерн для пошуку директорії 'html'.
-                    def htmlReportDirs = findFiles(glob: 'TestResults/**/html', allowEmpty: true) // Шукаємо папку 'html'
+                    def htmlReportDirs = findFiles(glob: 'TestResults/**/html', allowEmpty: true)
 
                     if (htmlReportDirs.length > 0) {
                         echo "Знайдено HTML директорію звіту: ${htmlReportDirs[0].path}"
-                        // Публікуємо HTML звіт за допомогою publishHTML
-                        // Переконайтесь, що "HTML Publisher Plugin" встановлено.
                         publishHTML(
                             target: [
-                                allowMissing         : false, // Змініть на true, якщо збірка не має падати при відсутності звіту
-                                alwaysPublishFromMaster: false, // Зазвичай false, якщо є агенти
-                                keepAll              : true,  // Зберігати звіти для всіх збірок
-                                reportDir            : htmlReportDirs[0].path, // Шлях до знайденої HTML директорії
-                                reportFiles          : 'index.html', // Головний файл звіту
-                                reportName           : 'Code Coverage Report', // Назва посилання в Jenkins UI
-                                allowEmptyReport     : false  // Змініть на true, якщо порожній звіт допустимий
+                                allowMissing         : false,
+                                alwaysPublishFromMaster: false,
+                                keepAll              : true,
+                                reportDir            : htmlReportDirs[0].path,
+                                reportFiles          : 'index.html',
+                                reportName           : 'Code Coverage Report',
+                                allowEmptyReport     : false
                             ]
                         )
                     } else {
                         echo "Попередження: HTML директорія звіту покриття не знайдена! Не можу опублікувати звіт."
-                         // Можна зробити збірку нестабільною, якщо звіт відсутній
-                         // unstable('HTML Coverage report not found')
                     }
                 }
             }
         }
-        // --- КІНЕЦЬ НОВОЇ СТАДІЇ ---
 
         stage('Build Docker Image') {
             steps {
@@ -197,8 +194,8 @@ pipeline {
                     } else {
                         if (env.DEPLOY_ENVIRONMENT == 'Production') {
                             echo "WARNING: Production override file ('${overrideFileName ?: 'docker-compose.production.yml'}') not found! Using only default docker-compose.yml for Production."
-                        } else if (env.DEPLOY_ENVIRONMENT == 'Development') {
-                            echo "INFO: Development override file ('${overrideFileName ?: 'docker-compose.development.yml'}') not found. Using only default docker-compose.yml for Development."
+                        } else if (env.DEPLOYMENT_ENVIRONMENT == 'Development') { // Виправлено опечатку DEPLOYMENT_ENVIRONMENT
+                             echo "INFO: Development override file ('${overrideFileName ?: 'docker-compose.development.yml'}') not found. Using only default docker-compose.yml for Development."
                         } else if (env.DEPLOY_ENVIRONMENT != "null" && env.DEPLOY_ENVIRONMENT != null) {
                             echo "INFO: No specific override file for ${env.DEPLOY_ENVIRONMENT} ('${overrideFileName}'). Using only default docker-compose.yml."
                         } else {
@@ -244,7 +241,7 @@ pipeline {
                 def finalDeployEnv = env.DEPLOY_ENVIRONMENT ?: "unknown_environment (was null)"
                 echo "Pipeline finished for branch ${finalBranchName} and environment ${finalDeployEnv}."
             }
-            // cleanWs() // Закоментовано, щоб зберегти файли після збірки для налагодження, якщо потрібно.
+            // cleanWs()
         }
         success {
             echo 'Pipeline succeeded!'
@@ -254,8 +251,9 @@ pipeline {
                 def finalBranchName = env.GIT_BRANCH_NAME ?: "unknown_branch (was null)"
                 def finalDeployEnv = env.DEPLOY_ENVIRONMENT ?: "unknown_environment (was null)"
                 echo 'Pipeline failed!'
-                if (env.ERROR_NOTIFICATION_EMAIL && env.ERROR_NOTIFICATION_EMAIL != 'solovey.itstep@gmial.com') {
-                    mail to: "${env.ERROR_NOTIFICATION_EMAIL}",
+                // Виправлено опечатку в перевірці email адреси
+                if (env.ERROR_NOTIFICATION_EMAIL && env.ERROR_NOTIFICATION_EMAIL != 'solovey.itstep@gmail.com') {
+                     mail to: "${env.ERROR_NOTIFICATION_EMAIL}",
                          subject: "FAILURE: Pipeline ${env.JOB_NAME} - Build #${env.BUILD_NUMBER} [${finalDeployEnv}]",
                          body: """Pipeline ${env.JOB_NAME} - Build #${env.BUILD_NUMBER} for environment ${finalDeployEnv} on branch ${finalBranchName} failed.
 Check console output for more details: ${env.BUILD_URL}console"""
