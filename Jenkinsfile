@@ -85,44 +85,25 @@ pipeline {
         }
 
 stage('Test & Coverage') {
-  agent {
-    docker {
-      image "mcr.microsoft.com/dotnet/sdk:${env.DOTNET_SDK_VERSION}"
-    }
-  }
   steps {
-    echo "Запускаємо тести з XPlat Code Coverage…"
-        sh '''
-          dotnet test Assessment.sln \
-            --configuration Release \
-            --no-build \
-            --collect:"XPlat Code Coverage" \
-            --results-directory TestResults
-
-            dotnet tool install --global dotnet-reportgenerator-globaltool --version 4.8.12
-  export PATH="$PATH:/root/.dotnet/tools"
-
-  reportgenerator \
-    -reports:TestResults/*/coverage.cobertura.xml \
-    -targetdir:CoverageReport \
-    -reporttypes:Cobertura
-        '''
+    sh '''
+      dotnet test Assessment.sln \
+        --configuration Release \
+        --no-build \
+        --collect:"XPlat Code Coverage" \
+        --results-directory TestResults
+    '''
   }
-
   post {
-    always {
-      // зібрати всі .cobertura.xml у папці TestResults
-      recordCoverage(
-        tools: [[
-          parser: 'COBERTURA',
-          pattern: 'TestResults/**/coverage.cobertura.xml'
-        ]],
-        sourceCodeRetention: 'EVERY_BUILD',
-        ignoreParsingErrors: true
-      )
+    success {
+      recordCoverage tools: [[
+        parser: 'Cobertura',
+        pattern: 'TestResults/*/coverage.cobertura.xml'
+      ]]
     }
   }
 }
+
 
 
         stage('Build Docker Image') {
