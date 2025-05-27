@@ -92,7 +92,14 @@ pipeline {
             }
             steps {
                 echo "Running .NET tests (Solution: Assessment.sln)..."
-                sh 'dotnet test Assessment.sln --configuration Release --no-build'
+                //sh 'dotnet test Assessment.sln --configuration Release --no-build'
+                // Collect code coverage via Coverlet
+                sh '''
+                  dotnet test \
+                    --configuration Release \
+                    --no-build \
+                    --collect:"XPlat Code Coverage"
+                '''
             }
         }
 
