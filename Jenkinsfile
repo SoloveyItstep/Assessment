@@ -99,8 +99,13 @@ stage('Test & Coverage') {
             --collect:"XPlat Code Coverage" \
             --results-directory TestResults
 
-            echo "=== Вміст TestResults ==="
-            ls -R TestResults
+            dotnet tool install --global dotnet-reportgenerator-globaltool --version 4.8.12
+  export PATH="$PATH:/root/.dotnet/tools"
+
+  reportgenerator \
+    -reports:TestResults/*/coverage.cobertura.xml \
+    -targetdir:CoverageReport \
+    -reporttypes:Cobertura
         '''
   }
 
