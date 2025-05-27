@@ -79,6 +79,11 @@ pipeline {
                 }
             }
             steps {
+                sh '''
+                  dotnet tool install --global dotnet-reportgenerator-globaltool --version 4.8.12
+                  export PATH="$PATH:$HOME/.dotnet/tools"
+                '''
+
                 echo "Building the ASP.NET Core application (Solution: Assessment.sln)..."
                 sh 'dotnet build Assessment.sln --configuration Release'
             }
