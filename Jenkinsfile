@@ -79,11 +79,6 @@ pipeline {
                 }
             }
             steps {
-                sh '''
-                  dotnet tool install --global dotnet-reportgenerator-globaltool --version 4.8.12
-                  export PATH="$PATH:$HOME/.dotnet/tools"
-                '''
-
                 echo "Building the ASP.NET Core application (Solution: Assessment.sln)..."
                 sh 'dotnet build Assessment.sln --configuration Release'
             }
@@ -96,46 +91,21 @@ stage('Test & Coverage') {
     }
   }
   steps {
-    echo "1) Запускаємо тести з Coverlet…"
-    sh '''
-      set -e
-
-      # 1) Тести з XPlat Code Coverage (quotes обовʼязкові!)
-      dotnet test Assessment.sln \
-        --configuration Release \
-        --no-build \
-        --collect:"XPlat Code Coverage" \
-        --results-directory "TestResults"
-
-      # 2) Перевіримо, що Coverage файл дійсно зʼявився
-      echo "=== Списoк файлів у TestResults ==="
-      find TestResults -type f -print
-
-      # 3) Встановлюємо ReportGenerator (якщо ще не встановлений)
-      dotnet tool install --global dotnet-reportgenerator-globaltool --version 4.8.12 \
-        || true    # ігнорувати помилку, якщо вже є
-      export PATH="$PATH:/root/.dotnet/tools"
-
-      # 4) Генеруємо TextSummary
-      reportgenerator \
-        "-reports:TestResults/*/coverage.cobertura.xml" \
-        "-targetdir:CoverageReport" \
-        "-reporttypes:TextSummary"
-    '''
+    echo "Запускаємо тести з XPlat Code Coverage…"
+        sh '''
+          dotnet test Assessment.sln \
+            --configuration Release \
+            --no-build \
+            --collect:"XPlat Code Coverage" \
+            --results-directory TestResults
+        '''
   }
 
   post {
     always {
-      // Якщо хочете – опублікувати HTML-версію у Jenkins через стандартний HTML Publisher:
-      publishHTML target: [
-        allowMissing: true,
-        alwaysLinkToLastBuild: true,
-        keepAll: true,
-        reportDir: 'CoverageReport',
-        reportFiles: 'index.html',
-        reportName: 'Coverage Report'
-      ]
-    }
+          // use Coverage Plugin’s recordCoverage step
+          recordCoverage tools: [ cobertura('TestResults/*/coverage.cobertura.xml') ]
+        }
   }
 }
 
