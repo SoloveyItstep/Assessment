@@ -1,7 +1,7 @@
 pipeline {
     agent {
         docker {
-            image 'mcr.microsoft.com/dotnet/sdk:9.0' // Залишаємо .NET 9.0 як ви просили
+            image 'mcr.microsoft.com/dotnet/sdk:9.0'
             args '-v $HOME/.nuget:/root/.nuget'
         }
     }
@@ -26,10 +26,10 @@ pipeline {
             }
         }
 
-        stage('Install Tools') { // НОВИЙ ЕТАП: Встановлення інструментів
+        stage('Install Tools') {
             steps {
                 echo "Installing trx2junit global tool..."
-                // Встановлюємо trx2junit в контейнер. Цей інструмент конвертує TRX в JUnit XML.
+                // Встановлюємо trx2junit. Він буде доданий до ~/.dotnet/tools, але не обов'язково до PATH сесії.
                 sh 'dotnet tool install -g trx2junit'
             }
         }
@@ -49,43 +49,53 @@ pipeline {
 
         stage('Test and Collect Coverage') {
             steps {
-                echo "Running .NET tests and collecting coverage (Solution: Assessment.sln)..."
-                // Виконуємо тести та збираємо покриття.
-                // Не вказуємо VSTestLogger тут, дозволяємо генерувати стандартний TRX файл.
-                sh 'dotnet test Assessment.sln ' +
+                echo "Running .NET tests and collecting coverage (Project: Session.UnitTests.csproj)..."
+                // *** ЗМІНА ТУТ: Тепер запускаємо тести на конкретному тестовому проекті ***
+                // Це забезпечить більш передбачуване розміщення результатів у --results-directory
+                sh 'dotnet test Session.UnitTests/Session.UnitTests.csproj ' +
                    '--configuration Release ' +
                    '--no-build ' +
                    '/p:CollectCoverage=true ' +
                    '/p:CoverletOutputFormat=cobertura ' +
-                   '/p:CoverletOutput=${WORKSPACE}/TestResults/coverage.xml ' + // Coverlet звіт буде тут
-                   '--results-directory "${WORKSPACE}/TestResults"' // Всі результати тестів (включно з TRX) будуть тут
+                   '/p:CoverletOutput="${WORKSPACE}/TestResults/coverage.xml" ' + // Цей шлях для CoverletOK
+                   '--results-directory "${WORKSPACE}/TestResults"' // Результати VSTest (TRX) підуть сюди
             }
             post {
                 always {
-                    echo "Listing contents of TestResults directory for conversion:"
-                    sh "ls -R ${WORKSPACE}/TestResults" // Виведе вміст для перевірки
+                    echo "Listing contents of TestResults directory for conversion (before conversion):"
+                    // Цей 'ls -R' тепер повинен показати вміст, включаючи GUID-папку
+                    sh "ls -R ${WORKSPACE}/TestResults"
 
-                    // Конвертуємо TRX файл у JUnit XML
                     script {
-                        def trxFile = "${WORKSPACE}/TestResults/TestResults.xml"
+                        // Знаходимо TRX файл. Він буде у форматі .trx і, ймовірно, у GUID-папці.
+                        // Використовуємо findFiles з Jenkins, це більш надійно, ніж sh find.
+                        def testResultFiles = findFiles(glob: "${WORKSPACE}/TestResults/**/*.trx")
+
+                        if (testResultFiles.length == 0) {
+                            // Якщо .trx не знайдено, спробуємо знайти будь-який .xml, якщо формат змінився.
+                            testResultFiles = findFiles(glob: "${WORKSPACE}/TestResults/**/*.xml")
+                        }
+
+                        if (testResultFiles.length == 0) {
+                            error "TRX or XML test results file not found in ${WORKSPACE}/TestResults/. Cannot publish JUnit report."
+                        }
+
+                        // Беремо перший знайдений файл результатів
+                        def trxFile = testResultFiles[0].path
+
                         def junitFile = "${WORKSPACE}/TestResults/junit.xml"
 
-                        // Перевіряємо, чи існує TRX файл перед конвертацією
-                        if (fileExists(trxFile)) {
-                            echo "Converting TRX report to JUnit XML: ${trxFile} -> ${junitFile}"
-                            // Використовуємо trx2junit для конвертації
-                            // '>' перенаправляє вивід в junit.xml
-                            sh "trx2junit ${trxFile} > ${junitFile}"
+                        echo "Converting test report to JUnit XML: ${trxFile} -> ${junitFile}"
+                        // *** ЗМІНА ТУТ: Викликаємо trx2junit через 'dotnet tool run' ***
+                        // Це найбезпечніший спосіб викликати глобальний інструмент .NET у пайплайні,
+                        // оскільки він не залежить від змінних середовища PATH.
+                        sh "dotnet tool run trx2junit \"${trxFile}\" > \"${junitFile}\""
 
-                            echo "Listing contents of TestResults after conversion:"
-                            sh "ls -R ${WORKSPACE}/TestResults" // Перевірка, чи з'явився junit.xml
+                        echo "Listing contents of TestResults directory after conversion:"
+                        sh "ls -R ${WORKSPACE}/TestResults" // Перевіряємо, чи з'явився junit.xml
 
-                            // Публікуємо JUnit звіт
-                            junit "${junitFile}" // Вказуємо шлях до згенерованого JUnit XML файлу
-                        } else {
-                            // Якщо TRX файл не знайдено, білд позначиться як FAILURE.
-                            error "TRX test results file not found at ${trxFile}. Cannot publish JUnit report."
-                        }
+                        // Публікуємо JUnit звіт з коректним шляхом
+                        junit "${junitFile}"
                     }
                 }
             }
@@ -93,8 +103,8 @@ pipeline {
 
         stage('Publish Coverage Report') {
             steps {
-                // Публікуємо звіт покриття за допомогою Cobertura Plugin
-                // Цей етап тепер повинен спрацювати, оскільки проблема з JUnit виправлена
+                // Цей шлях до coverage.xml повинен залишатися коректним,
+                // оскільки CoverletOutput був налаштований на цю директорію.
                 cobertura coberturaReportFile: '**/TestResults/coverage.xml',
                           lineCoverageTargets: '80, 90, 95',
                           branchCoverageTargets: '70, 80, 90',
@@ -106,8 +116,8 @@ pipeline {
         stage('Publish Application') {
             steps {
                 echo "Publishing application (Solution: Assessment.sln)..."
-                // Якщо ви хочете опублікувати конкретний проект з рішення:
-                // sh 'dotnet publish Assessment/Assessment.csproj --no-build --configuration Release -o app/publish'
+                // Якщо ви публікуєте конкретний проект, вкажіть його:
+                // sh 'dotnet publish Assessment/SessionMVC/SessionMVC.csproj --no-build --configuration Release -o app/publish'
                 sh 'dotnet publish Assessment.sln --no-build --configuration Release -o app/publish'
             }
         }
@@ -153,9 +163,7 @@ pipeline {
         failure {
             script {
                 echo "Pipeline failed for branch ${env.BRANCH_NAME} and environment ${env.DEPLOY_ENV}!"
-                // Ваша помилка з відправкою пошти (Connection refused) не стосується .NET,
-                // а пов'язана з налаштуванням SMTP-сервера в Jenkins.
-                // Перевірте Manage Jenkins -> Configure System -> Email Notification.
+                // Не забувайте про налаштування SMTP у Jenkins для сповіщень.
                 // mail(to: 'your_email@example.com', subject: "Jenkins Build Failed: ${env.JOB_NAME} - ${env.BUILD_NUMBER}", body: "Build failed: ${env.BUILD_URL}")
             }
         }
