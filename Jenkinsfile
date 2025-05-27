@@ -96,18 +96,21 @@ stage('Test Application (.NET)') {
     steps {
         echo "Running .NET tests for Assessment.sln with coverage..."
         sh '''
-            dotnet test Assessment.sln \
-                --configuration Release \
-                --no-build \
-                --collect:"XPlat Code Coverage"
+          dotnet test Assessment.sln \
+            --configuration Release \
+            --no-build \
+            --collect:"XPlat Code Coverage"
+
+          # Встановлюємо ReportGenerator (перший раз може трохи довше)
+          dotnet tool install --global dotnet-reportgenerator-globaltool --version 4.8.12
+          export PATH="$PATH:$HOME/.dotnet/tools"
+
+          # Генеруємо текстовий підсумок покриття:
+          reportgenerator \
+            "-reports:**/TestResults/*/coverage.cobertura.xml" \
+            "-targetdir:CoverageReport" \
+            "-reporttypes:TextSummary"
         '''
-    }
-    post {
-      always {
-        recordCoverage tools: [
-          cobertura(pattern: '**/TestResults/*/coverage.cobertura.xml')
-        ]
-      }
     }
 }
 
