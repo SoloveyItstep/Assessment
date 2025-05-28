@@ -20,7 +20,6 @@ public class HomeController(IHealthcheckSqlService healthcheckSqlService) : Cont
     public IActionResult Privacy()
     {
         var key = ".AspNetCore.Session";
-
         var value = HttpContext.Session.GetString(key);
 
         if (value == null)
@@ -30,6 +29,7 @@ public class HomeController(IHealthcheckSqlService healthcheckSqlService) : Cont
         }
 
         var id = HttpContext.Session.Id;
+
         return Ok(new { id });
     }
 
