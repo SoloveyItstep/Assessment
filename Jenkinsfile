@@ -85,20 +85,31 @@ pipeline {
         }
 
 stage('Test & Coverage') {
-      steps {
-        script {
-          docker.image('mcr.microsoft.com/dotnet/sdk:9.0').inside {
-            sh '''
-              dotnet test Assessment.sln \
-                --configuration Release \
-                --no-build \
-                --collect:"XPlat Code Coverage" \
-                --results-directory TestResults
-            '''
-          }
-        }
+  steps {
+    script {
+      docker.image('mcr.microsoft.com/dotnet/sdk:9.0').inside {
+        // власне тест
+        sh 'dotnet test Assessment.sln --configuration Release --no-build --collect:"XPlat Code Coverage" --results-directory TestResults'
+
+        // Додаємо відладку
+        sh '''
+          echo
+          echo "=== ВМІСТ РОБОЧОЇ ПАПКИ ПІСЛЯ TEST ==="
+          ls -R .
+
+          echo
+          echo "=== Спроба зайти в TestResults ==="
+          ls -R TestResults 2>/dev/null || echo "–> папка TestResults не знайдена всередині контейнера"
+
+          echo
+          echo "=== Шукаємо будь-які coverage-файли ==="
+          find . -type f -iname "*coverage*.xml" || echo "–> нічого не знайдено"
+        '''
       }
     }
+  }
+}
+
 stage('Debug coverage files') {
   steps {
     // покажемо структуру папки зі звітами
