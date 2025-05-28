@@ -9,8 +9,11 @@
   <ItemGroup>
     <PackageReference Include="AutoFixture" Version="4.18.1" />
     <PackageReference Include="JunitXml.TestLogger" Version="6.1.0" />
+    <PackageReference Include="Microsoft.AspNetCore.Http.Extensions" Version="2.3.0" />
+    <PackageReference Include="Microsoft.EntityFrameworkCore" Version="9.0.5" />
     <PackageReference Include="Microsoft.EntityFrameworkCore.Abstractions" Version="9.0.5" />
     <PackageReference Include="Microsoft.EntityFrameworkCore.InMemory" Version="9.0.5" />
+    <PackageReference Include="Microsoft.Extensions.DependencyModel" Version="9.0.5" />
     <PackageReference Include="Microsoft.NET.Test.Sdk" Version="17.14.0" />
     <PackageReference Include="Moq" Version="4.20.72" />
     <PackageReference Include="System.Net.Http" Version="4.3.4" />
@@ -26,7 +29,10 @@
 
   <ItemGroup>
     <ProjectReference Include="..\Session.Application\Session.Application.csproj" />
+    <ProjectReference Include="..\Session.Domain\Session.Domain.csproj" />
     <ProjectReference Include="..\Session.Persistence\Session.Persistence.csproj" />
+    <ProjectReference Include="..\Session.Services\Session.Services.csproj" />
+    <ProjectReference Include="..\SessionMVC\SessionMVC.csproj" />
   </ItemGroup>
 
 </Project>
