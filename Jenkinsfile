@@ -196,9 +196,13 @@ stage('Test & Coverage') {
         }
         success {
             echo 'Pipeline succeeded!'
-            recordCoverage adapters: [
-                coberturaAdapter(pattern: 'TestResults/*/coverage.cobertura.xml')
-              ]
+            recordCoverage(
+              tools: [
+                [parser: 'COBERTURA', pattern: 'TestResults/*/coverage.cobertura.xml']
+              ],
+      // опціонально: залишати вихідний код з останньої збірки
+      sourceCodeRetention: 'LAST_BUILD'
+    )
         }
         failure {
             script { 
