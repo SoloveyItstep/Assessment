@@ -206,12 +206,12 @@ pipeline {
         }
         success {
             echo 'Pipeline succeeded!'
-            echo 'Pipeline succeeded — збираємо coverage…'
+            //echo 'Pipeline succeeded — збираємо coverage…'
             // збираємо Cobertura-звіт
-            recordCoverage tools: [
-              cobertura(
-                coberturaReportFile: 'Session.UnitTests/TestResults/coverage.cobertura.xml'
-              )
+            //recordCoverage tools: [
+            //  cobertura(
+            //    coberturaReportFile: 'Session.UnitTests/TestResults/coverage.cobertura.xml'
+            //  )
     ],
     sourceCodeRetention: 'LAST_BUILD'
         }
