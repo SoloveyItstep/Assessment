@@ -88,19 +88,17 @@ stage('Test & Coverage') {
   agent { docker { image "mcr.microsoft.com/dotnet/sdk:9.0" } }
   steps {
     sh '''
-      rm -rf TestResults
-      mkdir -p TestResults
+      cd Session.UnitTests
 
-      dotnet test Session.UnitTests/Session.UnitTests.csproj \
+      rm -rf TestResults
+      dotnet test \
         --configuration Release \
         --no-build \
-        /p:CollectCoverage=true \
-        /p:CoverletOutputFormat=cobertura \
-        /p:CoverletOutput=TestResults/
+        --collect:"XPlat Code Coverage" \
+        --results-directory ./TestResults
 
-      echo
-      echo "=== Tree TestResults ==="
-      ls -R TestResults || echo "TestResults порожня"
+      echo "=== Tree of Session.UnitTests/TestResults ==="
+      ls -R TestResults
     '''
   }
 }
