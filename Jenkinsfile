@@ -85,32 +85,23 @@ pipeline {
         }
 
 stage('Test & Coverage') {
+  agent { docker { image "mcr.microsoft.com/dotnet/sdk:9.0" } }
   steps {
-    script {
-        
-      docker.image('mcr.microsoft.com/dotnet/sdk:9.0').inside {
-        // Додаємо відладку
-        sh '''
-        mkdir -p TestResults
-        dotnet test Session.UnitTests/Session.UnitTests.csproj \
+    sh '''
+      rm -rf TestResults
+      mkdir -p TestResults
+
+      dotnet test Session.UnitTests/Session.UnitTests.csproj \
         --configuration Release \
         --no-build \
-        --collect:"XPlat Code Coverage" \
-        --results-directory TestResults
-          echo
-          echo "=== ВМІСТ РОБОЧОЇ ПАПКИ ПІСЛЯ TEST ==="
-          ls -R .
+        /p:CollectCoverage=true \
+        /p:CoverletOutputFormat=cobertura \
+        /p:CoverletOutput=TestResults/
 
-          echo
-          echo "=== Спроба зайти в TestResults ==="
-          ls -R TestResults 2>/dev/null || echo "–> папка TestResults не знайдена всередині контейнера"
-
-          echo
-          echo "=== Шукаємо будь-які coverage-файли ==="
-          find . -type f -iname "*coverage*.xml" || echo "–> нічого не знайдено"
-        '''
-      }
-    }
+      echo
+      echo "=== Tree TestResults ==="
+      ls -R TestResults || echo "TestResults порожня"
+    '''
   }
 }
 
@@ -223,13 +214,11 @@ stage('Debug coverage files') {
         }
         success {
             echo 'Pipeline succeeded!'
+            echo 'Pipeline succeeded — збираємо coverage…'
             recordCoverage(
-              tools: [
-                [parser: 'COBERTURA', pattern: 'TestResults/*/coverage.cobertura.xml']
-              ],
-      // опціонально: залишати вихідний код з останньої збірки
-      sourceCodeRetention: 'LAST_BUILD'
-    )
+              tools: [cobertura('TestResults/**/coverage.cobertura.xml')],
+              sourceCodeRetention: 'LAST_BUILD'
+            )
         }
         failure {
             script { 
