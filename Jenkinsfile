@@ -86,25 +86,46 @@ pipeline {
 
 stage('Test & Coverage') {
   steps {
-    sh '''
-      dotnet test Assessment.sln \
+    script {
+        
+      docker.image('mcr.microsoft.com/dotnet/sdk:9.0').inside {
+        // Додаємо відладку
+        sh '''
+        mkdir -p TestResults
+        dotnet test Session.UnitTests/Session.UnitTests.csproj \
         --configuration Release \
         --no-build \
         --collect:"XPlat Code Coverage" \
         --results-directory TestResults
-    '''
-  }
-  post {
-    success {
-      recordCoverage tools: [[
-        parser: 'Cobertura',
-        pattern: 'TestResults/*/coverage.cobertura.xml'
-      ]]
+          echo
+          echo "=== ВМІСТ РОБОЧОЇ ПАПКИ ПІСЛЯ TEST ==="
+          ls -R .
+
+          echo
+          echo "=== Спроба зайти в TestResults ==="
+          ls -R TestResults 2>/dev/null || echo "–> папка TestResults не знайдена всередині контейнера"
+
+          echo
+          echo "=== Шукаємо будь-які coverage-файли ==="
+          find . -type f -iname "*coverage*.xml" || echo "–> нічого не знайдено"
+        '''
+      }
     }
   }
 }
 
-
+stage('Debug coverage files') {
+  steps {
+    // покажемо структуру папки зі звітами
+    sh '''
+      echo "=== Повний список файлів у TestResults ==="
+      ls -R TestResults || echo "Папка TestResults не знайдена"
+      echo
+      echo "=== Шукаємо coverage файли по всьому workspace ==="
+      find . -type f -iname "*coverage*.xml" || echo "Нічого не знайдено"
+    '''
+  }
+}
 
         stage('Build Docker Image') {
             steps {
@@ -202,6 +223,13 @@ stage('Test & Coverage') {
         }
         success {
             echo 'Pipeline succeeded!'
+            recordCoverage(
+              tools: [
+                [parser: 'COBERTURA', pattern: 'TestResults/*/coverage.cobertura.xml']
+              ],
+      // опціонально: залишати вихідний код з останньої збірки
+      sourceCodeRetention: 'LAST_BUILD'
+    )
         }
         failure {
             script { 
