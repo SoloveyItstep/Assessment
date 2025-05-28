@@ -87,17 +87,16 @@ pipeline {
 stage('Test & Coverage') {
   steps {
     script {
+        
+      docker.image('mcr.microsoft.com/dotnet/sdk:9.0').inside {
+        // Додаємо відладку
         sh '''
-      mkdir -p TestResults
-      dotnet test Session.UnitTests/Session.UnitTests.csproj \
+        mkdir -p TestResults
+        dotnet test Session.UnitTests/Session.UnitTests.csproj \
         --configuration Release \
         --no-build \
         --collect:"XPlat Code Coverage" \
         --results-directory TestResults
-    '''
-      docker.image('mcr.microsoft.com/dotnet/sdk:9.0').inside {
-        // Додаємо відладку
-        sh '''
           echo
           echo "=== ВМІСТ РОБОЧОЇ ПАПКИ ПІСЛЯ TEST ==="
           ls -R .
