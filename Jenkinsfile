@@ -87,17 +87,15 @@ pipeline {
 stage('Test & Coverage') {
   steps {
     script {
-      docker.image('mcr.microsoft.com/dotnet/sdk:9.0').inside {
-        // власне тест
         sh '''
-  dotnet test Session.UnitTests/Session.UnitTests.csproj \
-    --configuration Release \
-    /p:CollectCoverage=true \
-    /p:CoverletOutput=TestResults/ \
-    /p:CoverletOutputFormat=cobertura
-'''
-
-
+      mkdir -p TestResults
+      dotnet test Session.UnitTests/Session.UnitTests.csproj \
+        --configuration Release \
+        --no-build \
+        --collect:"XPlat Code Coverage" \
+        --results-directory TestResults
+    '''
+      docker.image('mcr.microsoft.com/dotnet/sdk:9.0').inside {
         // Додаємо відладку
         sh '''
           echo
