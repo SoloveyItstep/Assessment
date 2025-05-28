@@ -84,16 +84,30 @@ pipeline {
             }
         }
 
-        stage('Test Application (.NET)') {
-            agent {
-                docker {
-                    image "mcr.microsoft.com/dotnet/sdk:${env.DOTNET_SDK_VERSION}"
-                }
+        stage('Test & Coverage') {
+          agent {
+            docker { image "mcr.microsoft.com/dotnet/sdk:${env.DOTNET_SDK_VERSION}" }
+          }
+          steps {
+            dir('Session.UnitTests') {
+              sh '''
+                echo "Working dir: $(pwd)"
+                ls -la
+
+                rm -rf TestResults
+                mkdir -p TestResults
+
+                dotnet test Session.UnitTests.csproj \
+                  --configuration Release \
+                  /p:CollectCoverage=true \
+                  /p:CoverletOutput=TestResults/coverage \
+                  /p:CoverletOutputFormat=cobertura
+
+                echo "=== TestResults contents ==="
+                ls -R TestResults
+              '''
             }
-            steps {
-                echo "Running .NET tests (Solution: Assessment.sln)..."
-                sh 'dotnet test Assessment.sln --configuration Release --no-build'
-            }
+          }
         }
 
         stage('Build Docker Image') {
@@ -192,6 +206,14 @@ pipeline {
         }
         success {
             echo 'Pipeline succeeded!'
+            //echo 'Pipeline succeeded — збираємо coverage…'
+            // збираємо Cobertura-звіт
+            //recordCoverage tools: [
+            //  cobertura(
+            //    coberturaReportFile: 'Session.UnitTests/TestResults/coverage.cobertura.xml'
+            //  )
+            //],
+            //sourceCodeRetention: 'LAST_BUILD'
         }
         failure {
             script { 
