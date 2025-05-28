@@ -103,22 +103,29 @@ stage('Test & Coverage') {
   }
 }
 
-stage('Debug coverage files') {
+stage('Test & Coverage') {
+  agent {
+    docker {
+      image "mcr.microsoft.com/dotnet/sdk:${env.DOTNET_SDK_VERSION}"
+    }
+  }
   steps {
-    // покажемо структуру папки зі звітами
-    sh '''
-  rm -rf TestResults
-  dotnet test Session.UnitTests/Session.UnitTests.csproj \
-    --configuration Release \
-    --no-build \
-    --collect:"XPlat Code Coverage" \
-    --results-directory ${WORKSPACE}/TestResults
+    dir('Session.UnitTests') {
+      sh '''
+        rm -rf TestResults
+        dotnet test \
+          --configuration Release \
+          --no-build \
+          --collect "XPlat Code Coverage" \
+          --results-directory TestResults
 
-  echo "=== Tree of $WORKSPACE/TestResults ==="
-  ls -R TestResults
-'''
+        echo "=== Tree of Session.UnitTests/TestResults ==="
+        ls -R TestResults
+      '''
+    }
   }
 }
+
 
         stage('Build Docker Image') {
             steps {
@@ -218,9 +225,10 @@ stage('Debug coverage files') {
             echo 'Pipeline succeeded!'
             echo 'Pipeline succeeded — збираємо coverage…'
             recordCoverage(
-              tools: [cobertura('TestResults/**/coverage.cobertura.xml')],
+              tools: [cobertura('Session.UnitTests/TestResults/*/coverage.cobertura.xml')],
               sourceCodeRetention: 'LAST_BUILD'
             )
+
         }
         failure {
             script { 
