@@ -89,7 +89,14 @@ stage('Test & Coverage') {
     script {
       docker.image('mcr.microsoft.com/dotnet/sdk:9.0').inside {
         // власне тест
-        sh 'dotnet test Assessment.sln --configuration Release --no-build --collect:"XPlat Code Coverage" --results-directory TestResults'
+        sh '''
+  dotnet test Session.UnitTests/Session.UnitTests.csproj \
+    --configuration Release \
+    /p:CollectCoverage=true \
+    /p:CoverletOutput=TestResults/ \
+    /p:CoverletOutputFormat=cobertura
+'''
+
 
         // Додаємо відладку
         sh '''
