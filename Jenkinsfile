@@ -85,32 +85,25 @@ pipeline {
         }
 
 stage('Test & Coverage') {
+  agent {
+    docker { image "mcr.microsoft.com/dotnet/sdk:9.0" }
+  }
   steps {
-    script {
-        
-      docker.image('mcr.microsoft.com/dotnet/sdk:9.0').inside {
-        // Додаємо відладку
-        sh '''
-        mkdir -p TestResults
-        dotnet test Session.UnitTests/Session.UnitTests.csproj \
+    sh '''
+      # запускаємо тести з DataCollector-ом
+      dotnet test Session.UnitTests/Session.UnitTests.csproj \
         --configuration Release \
         --no-build \
         --collect:"XPlat Code Coverage" \
         --results-directory TestResults
-          echo
-          echo "=== ВМІСТ РОБОЧОЇ ПАПКИ ПІСЛЯ TEST ==="
-          ls -R .
 
-          echo
-          echo "=== Спроба зайти в TestResults ==="
-          ls -R TestResults 2>/dev/null || echo "–> папка TestResults не знайдена всередині контейнера"
-
-          echo
-          echo "=== Шукаємо будь-які coverage-файли ==="
-          find . -type f -iname "*coverage*.xml" || echo "–> нічого не знайдено"
-        '''
-      }
-    }
+      # дивимося що реально створилося
+      echo "=== Дерево папки TestResults ==="
+      ls -R TestResults || echo "TestResults не існує"
+      echo
+      echo "=== Звіти coverage ==="
+      find TestResults -type f -iname "coverage*.xml" || echo "Жодного coverage-XML не знайдено"
+    '''
   }
 }
 
