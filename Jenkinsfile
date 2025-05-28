@@ -88,13 +88,13 @@ stage('Test & Coverage') {
       steps {
         script {
           docker.image('mcr.microsoft.com/dotnet/sdk:9.0').inside {
-            sh '''\
+            sh '''
               dotnet test Assessment.sln \
                 --configuration Release \
                 --no-build \
                 --collect:"XPlat Code Coverage" \
                 --results-directory TestResults
-            '''.stripIndent()
+            '''
           }
         }
       }
@@ -196,9 +196,9 @@ stage('Test & Coverage') {
         }
         success {
             echo 'Pipeline succeeded!'
-            recordCoverage tools: [
-                cobertura(pattern: 'TestResults/*/coverage.cobertura.xml')
-          ]
+            recordCoverage adapters: [
+                coberturaAdapter(pattern: 'TestResults/*/coverage.cobertura.xml')
+              ]
         }
         failure {
             script { 
