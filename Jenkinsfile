@@ -216,10 +216,11 @@ stage('Debug coverage files') {
         }
         success {
             echo 'Pipeline succeeded!'
+            echo 'Pipeline succeeded — збираємо coverage…'
             recordCoverage(
-              tools: [
-                [parser: 'COBERTURA', pattern: 'TestResults/*/coverage.cobertura.xml']
-              ],
+              tools: [cobertura('TestResults/**/coverage.cobertura.xml')],
+              sourceCodeRetention: 'LAST_BUILD'
+            )
       // опціонально: залишати вихідний код з останньої збірки
       sourceCodeRetention: 'LAST_BUILD'
     )
