@@ -93,10 +93,12 @@ stage('Test & Coverage') {
       sh '''
         rm -rf TestResults
         dotnet test Session.UnitTests.csproj \
-          --configuration Release \
-          --no-build \
-          --collect:"XPlat Code Coverage" \
-          --results-directory TestResults
+  --configuration Release \
+  --no-build \
+  /p:CollectCoverage=true \
+  /p:CoverletOutputFormat=cobertura \
+  /p:CoverletOutput=TestResults/
+
 
         echo "=== Tree of Session.UnitTests/TestResults ==="
         ls -R TestResults
