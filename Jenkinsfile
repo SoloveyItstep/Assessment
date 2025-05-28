@@ -99,6 +99,18 @@ stage('Test & Coverage') {
         }
       }
     }
+stage('Debug coverage files') {
+  steps {
+    // покажемо структуру папки зі звітами
+    sh '''
+      echo "=== Повний список файлів у TestResults ==="
+      ls -R TestResults || echo "Папка TestResults не знайдена"
+      echo
+      echo "=== Шукаємо coverage файли по всьому workspace ==="
+      find . -type f -iname "*coverage*.xml" || echo "Нічого не знайдено"
+    '''
+  }
+}
 
         stage('Build Docker Image') {
             steps {
