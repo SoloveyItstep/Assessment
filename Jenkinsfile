@@ -86,18 +86,16 @@ pipeline {
 
 stage('Test & Coverage') {
   agent {
-    docker {
-      image "mcr.microsoft.com/dotnet/sdk:${env.DOTNET_SDK_VERSION}"
-    }
+    docker { image "mcr.microsoft.com/dotnet/sdk:${env.DOTNET_SDK_VERSION}" }
   }
   steps {
     dir('Session.UnitTests') {
       sh '''
         rm -rf TestResults
-        dotnet test \
+        dotnet test Session.UnitTests.csproj \
           --configuration Release \
           --no-build \
-          --collect "XPlat Code Coverage" \
+          --collect:"XPlat Code Coverage" \
           --results-directory TestResults
 
         echo "=== Tree of Session.UnitTests/TestResults ==="
@@ -106,6 +104,7 @@ stage('Test & Coverage') {
     }
   }
 }
+
 
 
         stage('Build Docker Image') {
