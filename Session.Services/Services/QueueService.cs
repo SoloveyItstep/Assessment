@@ -12,6 +12,11 @@ public class QueueService(IQueueRepository queueRepository) : IQueueService
 
     public Task SendMessage(string message)
     {
+        if (string.IsNullOrEmpty(message))
+        {
+            throw new ArgumentException("message can't be null or empty");
+        }
+
         return queueRepository.SendMessage(message);
     }
 }
