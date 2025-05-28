@@ -91,21 +91,25 @@ stage('Test & Coverage') {
   steps {
     dir('Session.UnitTests') {
       sh '''
+        echo "Working dir: $(pwd)"
+        ls -la
+
         rm -rf TestResults
         mkdir -p TestResults
+
         dotnet test Session.UnitTests.csproj \
           --configuration Release \
-          --no-build \
           /p:CollectCoverage=true \
-          /p:CoverletOutputFormat=cobertura \
-          /p:CoverletOutput=TestResults/
+          /p:CoverletOutput=TestResults/coverage \
+          /p:CoverletOutputFormat=cobertura
 
-        echo "=== Tree of Session.UnitTests/TestResults ==="
+        echo "=== TestResults contents ==="
         ls -R TestResults
       '''
     }
   }
 }
+
         stage('Build Docker Image') {
             steps {
                 script {
