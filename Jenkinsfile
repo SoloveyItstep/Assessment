@@ -221,9 +221,6 @@ stage('Debug coverage files') {
               tools: [cobertura('TestResults/**/coverage.cobertura.xml')],
               sourceCodeRetention: 'LAST_BUILD'
             )
-      // опціонально: залишати вихідний код з останньої збірки
-      sourceCodeRetention: 'LAST_BUILD'
-    )
         }
         failure {
             script { 
