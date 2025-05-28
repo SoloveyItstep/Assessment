@@ -212,8 +212,8 @@ pipeline {
             //  cobertura(
             //    coberturaReportFile: 'Session.UnitTests/TestResults/coverage.cobertura.xml'
             //  )
-    ],
-    sourceCodeRetention: 'LAST_BUILD'
+            //],
+            //sourceCodeRetention: 'LAST_BUILD'
         }
         failure {
             script { 
