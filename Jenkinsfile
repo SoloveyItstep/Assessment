@@ -92,13 +92,13 @@ stage('Test & Coverage') {
     dir('Session.UnitTests') {
       sh '''
         rm -rf TestResults
+        mkdir -p TestResults
         dotnet test Session.UnitTests.csproj \
-  --configuration Release \
-  --no-build \
-  /p:CollectCoverage=true \
-  /p:CoverletOutputFormat=cobertura \
-  /p:CoverletOutput=TestResults/
-
+          --configuration Release \
+          --no-build \
+          /p:CollectCoverage=true \
+          /p:CoverletOutputFormat=cobertura \
+          /p:CoverletOutput=TestResults/
 
         echo "=== Tree of Session.UnitTests/TestResults ==="
         ls -R TestResults
@@ -106,9 +106,6 @@ stage('Test & Coverage') {
     }
   }
 }
-
-
-
         stage('Build Docker Image') {
             steps {
                 script {
