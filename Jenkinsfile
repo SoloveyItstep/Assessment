@@ -94,20 +94,16 @@ stage('Test & Coverage') {
       dotnet test Session.UnitTests/Session.UnitTests.csproj \
         --configuration Release \
         --no-build \
-        --collect:"XPlat Code Coverage" \
-        --results-directory TestResults
+        /p:CollectCoverage=true \
+        /p:CoverletOutputFormat=cobertura \
+        /p:CoverletOutput=TestResults/
 
       echo
-      echo "=== Дерево папки TestResults після тестування ==="
+      echo "=== Tree TestResults ==="
       ls -R TestResults || echo "TestResults порожня"
-
-      echo
-      echo "=== Звіти coverage ==="
-      find TestResults -type f -iname "coverage*.xml" || echo "Файлів не знайдено"
     '''
   }
 }
-
 
 stage('Debug coverage files') {
   steps {
