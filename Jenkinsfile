@@ -107,12 +107,16 @@ stage('Debug coverage files') {
   steps {
     // покажемо структуру папки зі звітами
     sh '''
-      echo "=== Повний список файлів у TestResults ==="
-      ls -R TestResults || echo "Папка TestResults не знайдена"
-      echo
-      echo "=== Шукаємо coverage файли по всьому workspace ==="
-      find . -type f -iname "*coverage*.xml" || echo "Нічого не знайдено"
-    '''
+  rm -rf TestResults
+  dotnet test Session.UnitTests/Session.UnitTests.csproj \
+    --configuration Release \
+    --no-build \
+    --collect:"XPlat Code Coverage" \
+    --results-directory ${WORKSPACE}/TestResults
+
+  echo "=== Tree of $WORKSPACE/TestResults ==="
+  ls -R TestResults
+'''
   }
 }
 
