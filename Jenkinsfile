@@ -90,16 +90,20 @@ stage('Test & Coverage') {
   }
   steps {
     sh '''
-      # запускаємо тести з DataCollector-ом
+      # зачищаємо на всяк випадок
+      rm -rf TestResults
+      mkdir -p TestResults
+
       dotnet test Session.UnitTests/Session.UnitTests.csproj \
         --configuration Release \
         --no-build \
         --collect:"XPlat Code Coverage" \
         --results-directory TestResults
 
-      # дивимося що реально створилося
-      echo "=== Дерево папки TestResults ==="
+      echo
+      echo "=== Дерево папки TestResults після тестування ==="
       ls -R TestResults || echo "TestResults не існує"
+
       echo
       echo "=== Звіти coverage ==="
       find TestResults -type f -iname "coverage*.xml" || echo "Жодного coverage-XML не знайдено"
