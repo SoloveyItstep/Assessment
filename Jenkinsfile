@@ -207,10 +207,13 @@ pipeline {
         success {
             echo 'Pipeline succeeded!'
             echo 'Pipeline succeeded — збираємо coverage…'
-            recordCoverage(
-              tools: [cobertura('Session.UnitTests/TestResults/coverage.cobertura.xml')],
-              sourceCodeRetention: 'LAST_BUILD'
-            )
+            // збираємо Cobertura-звіт
+            recordCoverage tools: [
+              cobertura(
+                coberturaReportFile: 'Session.UnitTests/TestResults/coverage.cobertura.xml'
+              )
+    ],
+    sourceCodeRetention: 'LAST_BUILD'
         }
         failure {
             script { 
