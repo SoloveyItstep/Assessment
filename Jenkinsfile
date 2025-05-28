@@ -85,12 +85,9 @@ pipeline {
         }
 
 stage('Test & Coverage') {
-  agent {
-    docker { image "mcr.microsoft.com/dotnet/sdk:9.0" }
-  }
+  agent { docker { image "mcr.microsoft.com/dotnet/sdk:9.0" } }
   steps {
     sh '''
-      # зачищаємо на всяк випадок
       rm -rf TestResults
       mkdir -p TestResults
 
@@ -102,14 +99,15 @@ stage('Test & Coverage') {
 
       echo
       echo "=== Дерево папки TestResults після тестування ==="
-      ls -R TestResults || echo "TestResults не існує"
+      ls -R TestResults || echo "TestResults порожня"
 
       echo
       echo "=== Звіти coverage ==="
-      find TestResults -type f -iname "coverage*.xml" || echo "Жодного coverage-XML не знайдено"
+      find TestResults -type f -iname "coverage*.xml" || echo "Файлів не знайдено"
     '''
   }
 }
+
 
 stage('Debug coverage files') {
   steps {
